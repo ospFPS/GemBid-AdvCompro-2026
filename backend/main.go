@@ -73,11 +73,91 @@ func main() {
 			),
 		),
 	)
+
+	// ============================================================
+	// GEMS
+	// ============================================================
+
 	mux.HandleFunc(
 		"POST /api/gems",
 		AuthMiddleware(
 			VerifiedSellerMiddleware(
 				CreateGemHandler,
+			),
+		),
+	)
+
+	// Public — browse all gems.
+	mux.HandleFunc(
+		"GET /api/gems",
+		ListGemsHandler,
+	)
+
+	// Public — single gem detail.
+	mux.HandleFunc(
+		"GET /api/gems/{id}",
+		GetGemHandler,
+	)
+
+	mux.HandleFunc(
+		"PUT /api/gems/{id}",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				UpdateGemHandler,
+			),
+		),
+	)
+
+	mux.HandleFunc(
+		"DELETE /api/gems/{id}",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				DeleteGemHandler,
+			),
+		),
+	)
+
+	// ============================================================
+	// LISTINGS
+	// ============================================================
+
+	mux.HandleFunc(
+		"POST /api/listings",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				CreateListingHandler,
+			),
+		),
+	)
+
+	// Public — browse published/active listings.
+	mux.HandleFunc(
+		"GET /api/listings",
+		ListListingsHandler,
+	)
+
+	// Public — single listing detail.
+	mux.HandleFunc(
+		"GET /api/listings/{id}",
+		GetListingHandler,
+	)
+
+	// Seller-owned — choose sale type (FIXED_PRICE or AUCTION) for a DRAFT listing.
+	mux.HandleFunc(
+		"PUT /api/listings/{id}/publish",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				PublishListingHandler,
+			),
+		),
+	)
+
+	// Seller-owned — only while still DRAFT.
+	mux.HandleFunc(
+		"DELETE /api/listings/{id}",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				DeleteListingHandler,
 			),
 		),
 	)
