@@ -1,39 +1,20 @@
 import Link from "next/link";
+import { getListings, PAGE_SIZE_OPTIONS } from "../listings";
 
-const items = [
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-];
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(Array.isArray(value) ? value[0] : value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
-export default function StorePage() {
+export default async function StorePage({ searchParams }) {
+  const params = await searchParams;
+  const requestedPageSize = parsePositiveInteger(params.pageSize, 20);
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize)
+    ? requestedPageSize
+    : 20;
+  const page = parsePositiveInteger(params.page, 1);
+  const result = await getListings({ page, pageSize });
+
   return (
     <main className="store-layout">
       <h1>Absolute cinema CO. gem trading</h1>
@@ -58,15 +39,46 @@ export default function StorePage() {
 
         {/* listing */}
         <section className="store-listing" aria-label="Gem listings">
+          {/* setting for listing per page */}
+          <form className="listing-size" action="/store" method="get">
+            <label htmlFor="page-size">Listings per page </label>
+            <select id="page-size" name="pageSize" defaultValue={pageSize}>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <button type="submit">Apply</button>
+          </form>
+          {/* items */}
           <div id="items">
-            {items.map((item, index) => (
-              <article className="store-item" key={`${item.title}-${index}`}>
-                <img src={item.image} alt={item.title} />
-                <h2>{item.title}</h2>
-                <p>{item.description}</p>
-              </article>
+            {result.items.map((item) => (
+              <Link
+                className="store-item-link"
+                href={{ pathname: "/item", query: { id: item.id } }}
+                key={item.id}
+              >
+                <article className="store-item">
+                  <img src={item.image} alt={item.title} />
+                  <h2>{item.title}</h2>
+                  <p>{item.description}</p>
+                </article>
+              </Link>
             ))}
           </div>
+          {/* page navigation */}
+          <nav className="pages" aria-label="Listing pages">
+            {result.page > 1 && (
+              <Link href={{ pathname: "/store", query: { page: result.page - 1, pageSize } }}>
+                Previous
+              </Link>
+            )}
+            <span> Page {result.page} of {result.totalPages} ({result.total} listings) </span>
+            {result.page < result.totalPages && (
+              <Link href={{ pathname: "/store", query: { page: result.page + 1, pageSize } }}>
+                Next
+              </Link>
+            )}
+          </nav>
         </section>
       </div>
     </main>
