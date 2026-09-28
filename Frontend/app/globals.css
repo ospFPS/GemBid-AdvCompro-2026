@@ -1,0 +1,260 @@
+/* :root {
+  background: #b984b5;
+} */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-top: 0;
+  text-align: center;
+}
+
+.store-layout {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.store-layout > h1 {
+  margin: 1.25rem 1rem;
+}
+
+/* Store */
+.store-top-nav ul {
+  display: flex;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  list-style: none;
+  border: 1px solid #000000;
+  background: #ffffff;
+}
+
+/* store listing and left navigation bar */
+.store-content {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  padding-bottom: 1.5rem;
+}
+
+.store-listing {
+  width: 100%;
+  padding: 1rem;
+}
+
+#items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.store-item {
+  padding: 1rem;
+  border: 1px solid #000000;
+  background: #ffffff;
+}
+
+.store-item img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+}
+
+.store-item h2 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1.125rem;
+}
+
+.store-item p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* store-leftsied navigaion bar */
+.store-left-nav {
+  align-self: stretch;
+  flex: 0 0 12rem;
+  min-width: 12rem;
+  padding: 1.5rem;
+  border: 1px solid #000000;
+  border-top: none;
+  background: #ffffff;
+}
+
+.store-left-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-left-nav li + li {
+  margin-top: 0.75rem;
+}
+
+.nav-link {
+  color: #111111;
+}
+
+/* login - signup */
+.login-signup-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 1rem;
+  background-image: url("/assets/Sponsored.png");
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+.login-signup-page form {
+  width: min(100%, 324px);
+  padding: 2rem;
+  border: 1px solid #000000;
+  background: #ffffff;
+}
+
+.login-signup-page label {
+  display: block;
+  margin: 1rem 0 0.35rem;
+}
+
+.login-signup-page input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.login-signup-page button {
+  width: 100%;
+  margin: 1.5rem 0 1rem;
+  padding: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  background-color: #ff7070;
+}
+
+@media (max-width: 600px) {
+  .store-content {
+    flex-direction: column;
+    padding-bottom: 1rem;
+  }
+
+  .store-left-nav {
+    width: 100%;
+  }
+
+  .store-left-nav ul {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .store-left-nav li + li {
+    margin-top: 0;
+  }
+}
+
+
+/* =========================
+   User Home Page
+   ========================= */
+
+.user-home {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f3f5;
+}
+
+/* Header */
+
+.home-header {
+    background-color: white;
+    border-bottom: 1px solid #ccc;
+    padding: 20px;
+}
+
+.home-header h1 {
+    margin: 0 0 15px 0;
+}
+
+.home-header nav {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.home-header nav a {
+    color: black;
+    text-decoration: none;
+}
+
+.home-header nav a:hover {
+    text-decoration: underline;
+}
+
+/* Main content */
+
+.home-content {
+    padding: 40px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.welcome-section {
+    background-color: rgb(255, 255, 255);
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 2px solid #000000;
+}
+
+.welcome-section h2 {
+    font-size: 40px;
+    margin-top: 0;
+}
+
+/* Navigation cards */
+
+.home-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.home-card {
+    display: block;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 25px;
+    text-decoration: none;
+    color: black;
+    min-height: 120px;
+}
+.home-card:hover {
+    border-color: black;
+}
+.home-card h3 {
+    margin-top: 0;
+}
+.home-card p {
+    color: #555;
+}
+
+/* Become seller */
+
+.seller-card {
+    border: 2px solid #888;
+}
