@@ -3,34 +3,34 @@ const itemsContainer = document.querySelector("#items");
 function loadItems() {
     const items = [
         {
-            "title": "Leek",
+            "title": "Leek (This is a test item)",
             "description": "A rare gem from the northern caves.",
             "image": "../assets/Leek.jpg"
         },
         {
-            "title": "Amog",
+            "title": "Amog (This is a test item)",
             "description": "A gem from mars.",
-            "image": "../assets/Leek.jpg"
+            "image": "../assets/Reaction.jpg"
         },
                 {
-            "title": "Leek",
+            "title": "Leek (This is a test item)",
             "description": "A rare gem from the northern caves.",
             "image": "../assets/Leek.jpg"
         },
         {
-            "title": "Amog",
+            "title": "Amog (This is a test item)",
             "description": "A gem from mars.",
-            "image": "../assets/Leek.jpg"
+            "image": "../assets/Reaction.jpg"
         },
                 {
-            "title": "Leek",
+            "title": "Leek (This is a test item)",
             "description": "A rare gem from the northern caves.",
             "image": "../assets/Leek.jpg"
         },
         {
-            "title": "Amog",
+            "title": "Amog (This is a test item)",
             "description": "A gem from mars.",
-            "image": "../assets/Leek.jpg"
+            "image": "../assets/Reaction.jpg"
         },
     ];
 
