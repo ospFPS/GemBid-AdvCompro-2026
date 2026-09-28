@@ -199,6 +199,7 @@ h1 {
 
 .home-header nav a {
     color: black;
+    font-size: 1.2rem;
     text-decoration: none;
 }
 
@@ -210,19 +211,26 @@ h1 {
 
 .home-content {
     padding: 40px;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: auto;
+}
+.home-content p {
+    font-size: 1.2rem;
+}
+.home-content h3 {
+    font-size: 1.5rem;
+    margin-top: 0;
 }
 
 .welcome-section {
     background-color: rgb(255, 255, 255);
     padding: 30px;
     margin-bottom: 30px;
-    border: 2px solid #000000;
+    border: 1px solid #b5b5b5;
 }
 
 .welcome-section h2 {
-    font-size: 40px;
+    font-size: 3rem;
     margin-top: 0;
 }
 
@@ -230,7 +238,7 @@ h1 {
 
 .home-options {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 20px;
 }
 
@@ -244,6 +252,7 @@ h1 {
     min-height: 120px;
 }
 .home-card:hover {
+    border: 2px solid #b5b5b5;
     border-color: black;
 }
 .home-card h3 {
@@ -256,5 +265,175 @@ h1 {
 /* Become seller */
 
 .seller-card {
-    border: 2px solid #888;
+    border: 2px solid #a446c9;
+}
+
+/* =========================
+   Profile Page
+   ========================= */
+
+.profile-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.profile-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.profile-card {
+    width: min(100%, 700px);
+    margin: 0 auto 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+}
+.profile-card h2 {
+    margin-top: 0;
+    font-size: 1.75rem;
+}
+.profile-card p {
+    font-size: 1.2rem;
+}
+.profile-information p {
+    margin: 0.75rem 0;
+    font-size: 1.2rem;
+}
+.profile-status p {
+    margin: 0.75rem 0;
+    font-size: 1.2rem;
+}
+.profile-link {
+    color: #a446c9;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.profile-link:hover {
+    text-decoration: underline;
+}
+.profile-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.profile-actions button {
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.profile-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.profile-home-link:hover {
+    text-decoration: underline;
+}
+/* Profile Edit Form */
+
+.profile-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.profile-edit-form label {
+  font-size: 1.2rem;
+    margin-top: 0.5rem;
+}
+
+.profile-edit-form input {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    font-family: Arial, sans-serif;
+    border: 1px solid #000000;
+}
+
+.profile-edit-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.profile-edit-actions button {
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+/* =========================
+   Become Seller Page
+   ========================= */
+.seller-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.seller-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    text-decoration: none;
+    font-size: 1.2rem;
+}
+.seller-home-link:hover {
+    text-decoration: underline;
+}
+.seller-page > h1 {
+    margin-bottom: 0.5rem;
+    font-size: 3rem;
+}
+.seller-introduction {
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 1.2rem;
+}
+.seller-form {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.seller-form-card {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+}
+.seller-form-card h2 {
+    margin-top: 0;
+    font-size: 1.75rem;
+}
+.seller-form-card label {
+    display: block;
+    margin: 1rem 0 0.35rem;
+    font-size: 1.2rem;
+}
+.seller-form-card input,
+.seller-form-card textarea,
+.seller-form-card select {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    font-family: Arial, sans-serif;
+}
+.seller-form-card textarea {
+    resize: vertical;
+}
+.seller-form-card input[type="file"] {
+    padding: 0.25rem 0;
+}
+.seller-form-card p {
+  font-size: 1.2rem;
+}
+.seller-form-card button {
+    padding: 0.6rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ff7070;
+    border: 1px solid #000000;
 }
