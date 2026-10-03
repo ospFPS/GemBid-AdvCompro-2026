@@ -26,10 +26,10 @@ function parseOptionalPrice(value, label) {
 
 export default async function StorePage({ searchParams }) {
   const params = await searchParams;
-  const requestedPageSize = parsePositiveInteger(params.pageSize, 20);
+  const requestedPageSize = parsePositiveInteger(params.pageSize, 10);
   const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize)
     ? requestedPageSize
-    : 20;
+    : 10;
   const page = parsePositiveInteger(params.page, 1);
   const minPriceResult = parseOptionalPrice(params.minPrice, "Minimum price");
   const maxPriceResult = parseOptionalPrice(params.maxPrice, "Maximum price");
@@ -42,16 +42,19 @@ export default async function StorePage({ searchParams }) {
       : null);
   const minPrice = minPriceResult.value;
   const maxPrice = maxPriceResult.value;
+  const searchTitle = getSingleParam(params.search)?.trim() ?? "";
   const result = priceError
     ? null
-    : await getListings({ page, pageSize, minPrice, maxPrice });
+    : await getListings({ page, pageSize, minPrice, maxPrice, searchTitle });
   const filterQuery = {
     ...(minPrice !== undefined ? { minPrice } : {}),
     ...(maxPrice !== undefined ? { maxPrice } : {}),
+    ...(searchTitle ? { search: searchTitle } : {}),
   };
 
   return (
     <main className="store-layout">
+      <img src="/assets/Dependencies2.gif"/>
       <h1>Absolute cinema CO. gem trading</h1>
       {/* Top tab */}
       <nav className="store-top-nav" aria-label="Account navigation">
@@ -74,6 +77,10 @@ export default async function StorePage({ searchParams }) {
           <form className="price-filter" action="/store" method="get">
             <h2>Price range</h2>
             <input type="hidden" name="pageSize" value={pageSize} />
+            {/* this "searchTitle" is added for the searchbar to functions properly, I am too lazy to organized it */}
+            {searchTitle && (
+              <input type="hidden" name="search" value={searchTitle} />
+            )}
             <label htmlFor="min-price">Min price</label>
             <input
               id="min-price"
@@ -96,10 +103,32 @@ export default async function StorePage({ searchParams }) {
             />
             <button type="submit">Apply price range</button>
           </form>
+
+          <img src="/assets/Dependencies.gif"/>
         </nav>
 
         {/* listing */}
         <section className="store-listing" aria-label="Gem listings">
+          {/* search bar */}
+          <form className="listing-search" action="/store" method="get">
+            <label htmlFor="listing-search">Search listings</label>
+            <input
+              id="listing-search"
+              name="search"
+              type="search"
+              placeholder="Search by title"
+              defaultValue={searchTitle}
+            />
+            <input type="hidden" name="pageSize" value={pageSize} />
+            {minPrice !== undefined && (
+              <input type="hidden" name="minPrice" value={minPrice} />
+            )}
+            {maxPrice !== undefined && (
+              <input type="hidden" name="maxPrice" value={maxPrice} />
+            )}
+            <button type="submit">Search</button>
+          </form>
+
           {/* setting for listing per page */}
           <form className="listing-size" action="/store" method="get">
             <label htmlFor="page-size">Listings per page </label>
@@ -108,6 +137,9 @@ export default async function StorePage({ searchParams }) {
             )}
             {maxPrice !== undefined && (
               <input type="hidden" name="maxPrice" value={maxPrice} />
+            )}
+            {searchTitle && (
+              <input type="hidden" name="search" value={searchTitle} />
             )}
             <select id="page-size" name="pageSize" defaultValue={pageSize}>
               {PAGE_SIZE_OPTIONS.map((size) => (

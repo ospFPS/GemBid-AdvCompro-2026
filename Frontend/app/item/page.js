@@ -16,12 +16,12 @@ export default async function ItemPage({ searchParams }) {
 				Back to marketplace
 			</Link>
 			<article className="item-detail">
-				<item className="item-detail-imageBox">
+				<div className="item-detail-imageBox">
 					<div>
-						<img src={item.image} alt={item.title}></img>
+						<img src={item.image} alt={item.title} />
 					</div>
-				</item>
-				<item className="item-detail-infoBox">
+				</div>
+				<div className="item-detail-infoBox">
 					<div>
 						<h1>{item.title}</h1>
 						<p>{item.description}</p>
@@ -36,7 +36,7 @@ export default async function ItemPage({ searchParams }) {
 							<button type="button">Add to cart</button>
 						</div>
 					</div>
-				</item>
+				</div>
 			</article>
 		</main>
 	);

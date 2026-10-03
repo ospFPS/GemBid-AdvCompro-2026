@@ -31,6 +31,7 @@ h1 {
 
 .store-layout>h1 {
   margin: 1.25rem 1rem;
+  display: block;
 }
 
 /* Store */
@@ -51,6 +52,22 @@ h1 {
   align-items: stretch;
   padding-bottom: 1.5rem;
 }
+
+/* -------------- */
+/* "dependencies" */
+.store-content img{
+  max-width: 100%;
+  display: block;
+  margin-top: auto;
+}
+
+.store-layout img {
+  max-height: 100px;
+  display: flex;
+  margin-right: auto; 
+}
+/* "dependencies" */
+/* -------------- */
 
 .store-listing {
   display: flex;
@@ -110,6 +127,56 @@ h1 {
 .listing-size button:focus-visible {
   outline: 3px solid #777777;
   outline-offset: 3px;
+}
+
+/* Listing title search bar */
+.listing-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.listing-search label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.listing-search input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #b8b8b8;
+  border-radius: 0.35rem;
+  font: inherit;
+}
+
+.listing-search input:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.listing-search button {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #111111;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.listing-search button:hover {
+  background: #111111;
+  color: #ffffff;
+}
+
+.listing-search button:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
 }
 
 /* The item that is being list for sales itself */
@@ -307,6 +374,8 @@ h1 {
 
 /* store-leftsied navigaion bar */
 .store-left-nav {
+  display: flex;
+  flex-direction: column;
   align-self: stretch;
   flex: 0 0 12rem;
   min-width: 12rem;

@@ -91,13 +91,17 @@ export const PAGE_SIZE_OPTIONS = [3, 10, 50];
 
 export async function getListings({
 	page = 1,
-	pageSize = 20,
+	pageSize = 10,
 	minPrice,
 	maxPrice,
+	searchTitle = "",
 } = {}) {
+	const normalizedTitle = searchTitle.trim().toLowerCase();
+	// Filter titles without regard to capitalization.
 	const filteredItems = mockItems.filter((item) =>
 		(minPrice === undefined || item.price >= minPrice)
 		&& (maxPrice === undefined || item.price <= maxPrice)
+		&& item.title.toLowerCase().includes(normalizedTitle)
 	);
 	const total = filteredItems.length;
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
