@@ -1,41 +1,60 @@
 import Link from "next/link";
+import { getListings, PAGE_SIZE_OPTIONS } from "../listings";
 
-const items = [
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-  {
-    title: "Leek (This is a test item)",
-    description: "A rare gem from the northern caves.",
-    image: "/assets/Leek.jpg",
-  },
-  {
-    title: "Amog (This is a test item)",
-    description: "A gem from mars.",
-    image: "/assets/Reaction.jpg",
-  },
-];
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(Array.isArray(value) ? value[0] : value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
-export default function StorePage() {
+function getSingleParam(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseOptionalPrice(value, label) {
+  const rawValue = getSingleParam(value);
+  if (rawValue === undefined || rawValue.trim() === "") {
+    return { value: undefined, error: null };
+  }
+
+  const price = Number(rawValue);
+  if (!Number.isFinite(price) || price < 0) {
+    return { value: undefined, error: `${label} must be a non-negative number.` };
+  }
+
+  return { value: price, error: null };
+}
+
+export default async function StorePage({ searchParams }) {
+  const params = await searchParams;
+  const requestedPageSize = parsePositiveInteger(params.pageSize, 10);
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize)
+    ? requestedPageSize
+    : 10;
+  const page = parsePositiveInteger(params.page, 1);
+  const minPriceResult = parseOptionalPrice(params.minPrice, "Minimum price");
+  const maxPriceResult = parseOptionalPrice(params.maxPrice, "Maximum price");
+  const priceError = minPriceResult.error
+    || maxPriceResult.error
+    || (minPriceResult.value !== undefined
+      && maxPriceResult.value !== undefined
+      && minPriceResult.value > maxPriceResult.value
+      ? "Minimum price cannot be greater than maximum price."
+      : null);
+  const minPrice = minPriceResult.value;
+  const maxPrice = maxPriceResult.value;
+  const searchTitle = getSingleParam(params.search)?.trim() ?? "";
+  const result = priceError
+    ? null
+    : await getListings({ page, pageSize, minPrice, maxPrice, searchTitle });
+  const filterQuery = {
+    ...(minPrice !== undefined ? { minPrice } : {}),
+    ...(maxPrice !== undefined ? { maxPrice } : {}),
+    ...(searchTitle ? { search: searchTitle } : {}),
+  };
+
   return (
     <main className="store-layout">
+      <img src="/assets/Dependencies2.gif"/>
       <h1>Absolute cinema CO. gem trading</h1>
       {/* Top tab */}
       <nav className="store-top-nav" aria-label="Account navigation">
@@ -54,19 +73,130 @@ export default function StorePage() {
             <li><Link className="nav-link" href="/">Stuff 2</Link></li>
             <li><Link className="nav-link" href="/">Stuff 3</Link></li>
           </ul>
+          {/* price filter */}
+          <form className="price-filter" action="/store" method="get">
+            <h2>Price range</h2>
+            <input type="hidden" name="pageSize" value={pageSize} />
+            {/* this "searchTitle" is added for the searchbar to functions properly, I am too lazy to organized it */}
+            {searchTitle && (
+              <input type="hidden" name="search" value={searchTitle} />
+            )}
+            <label htmlFor="min-price">Min price</label>
+            <input
+              id="min-price"
+              name="minPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="No minimum"
+              defaultValue={getSingleParam(params.minPrice) ?? ""}
+            />
+            <label htmlFor="max-price">Max price</label>
+            <input
+              id="max-price"
+              name="maxPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="No maximum"
+              defaultValue={getSingleParam(params.maxPrice) ?? ""}
+            />
+            <button type="submit">Apply price range</button>
+          </form>
+
+          <img src="/assets/Dependencies.gif"/>
         </nav>
 
         {/* listing */}
         <section className="store-listing" aria-label="Gem listings">
-          <div id="items">
-            {items.map((item, index) => (
-              <article className="store-item" key={`${item.title}-${index}`}>
-                <img src={item.image} alt={item.title} />
-                <h2>{item.title}</h2>
-                <p>{item.description}</p>
-              </article>
-            ))}
-          </div>
+          {/* search bar */}
+          <form className="listing-search" action="/store" method="get">
+            <label htmlFor="listing-search">Search listings</label>
+            <input
+              id="listing-search"
+              name="search"
+              type="search"
+              placeholder="Search by title"
+              defaultValue={searchTitle}
+            />
+            <input type="hidden" name="pageSize" value={pageSize} />
+            {minPrice !== undefined && (
+              <input type="hidden" name="minPrice" value={minPrice} />
+            )}
+            {maxPrice !== undefined && (
+              <input type="hidden" name="maxPrice" value={maxPrice} />
+            )}
+            <button type="submit">Search</button>
+          </form>
+
+          {/* setting for listing per page */}
+          <form className="listing-size" action="/store" method="get">
+            <label htmlFor="page-size">Listings per page </label>
+            {minPrice !== undefined && (
+              <input type="hidden" name="minPrice" value={minPrice} />
+            )}
+            {maxPrice !== undefined && (
+              <input type="hidden" name="maxPrice" value={maxPrice} />
+            )}
+            {searchTitle && (
+              <input type="hidden" name="search" value={searchTitle} />
+            )}
+            <select id="page-size" name="pageSize" defaultValue={pageSize}>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <button type="submit">Apply</button>
+          </form>
+          {/* items */}
+          {priceError ? (
+            <p className="price-filter-error" role="alert">{priceError}</p>
+          ) : (
+            <>
+              <div id="items">
+                {result.items.length > 0 ? result.items.map((item) => (
+                  <Link
+                    className="store-item-link"
+                    href={{ pathname: "/item", query: { id: item.id } }}
+                    key={item.id}
+                  >
+                    <article className="store-item">
+                      <img src={item.image} alt={item.title} />
+                      <h2>{item.title}</h2>
+                      <p>{item.description}</p>
+                      <p className="store-item-price">
+                        {new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "USD",
+                        }).format(item.price)}
+                      </p>
+                    </article>
+                  </Link>
+                )) : (
+                  <p className="empty-listings">No listings match your current filters.</p>
+                )}
+              </div>
+              <nav className="pages" aria-label="Listing pages">
+                {result.page > 1 && (
+                  <Link href={{
+                    pathname: "/store",
+                    query: { page: result.page - 1, pageSize, ...filterQuery },
+                  }}>
+                    Previous
+                  </Link>
+                )}
+                <span> Page {result.page} of {result.totalPages} ({result.total} listings) </span>
+                {result.page < result.totalPages && (
+                  <Link href={{
+                    pathname: "/store",
+                    query: { page: result.page + 1, pageSize, ...filterQuery },
+                  }}>
+                    Next
+                  </Link>
+                )}
+              </nav>
+            </>
+          )}
         </section>
       </div>
     </main>
