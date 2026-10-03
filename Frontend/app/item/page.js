@@ -16,11 +16,27 @@ export default async function ItemPage({ searchParams }) {
 				Back to marketplace
 			</Link>
 			<article className="item-detail">
-				<img src={item.image} alt={item.title} />
-				<div>
-					<h1>{item.title}</h1>
-					<p>{item.description}</p>
-				</div>
+				<item className="item-detail-imageBox">
+					<div>
+						<img src={item.image} alt={item.title}></img>
+					</div>
+				</item>
+				<item className="item-detail-infoBox">
+					<div>
+						<h1>{item.title}</h1>
+						<p>{item.description}</p>
+						<p className="item-detail-price">
+							{new Intl.NumberFormat("en-US", {
+								style: "currency",
+								currency: "USD",
+							}).format(item.price)}
+						</p>
+						<div className="item-detail-actions">
+							<button type="button">Buy now</button>
+							<button type="button">Add to cart</button>
+						</div>
+					</div>
+				</item>
 			</article>
 		</main>
 	);

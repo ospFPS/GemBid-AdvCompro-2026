@@ -5,36 +5,42 @@ const mockItems = [
 		title: "Leek (This is a test item)",
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
+		price: 12.99,
 	},
 	{
 		id: "amog-1",
 		title: "Amog (This is a test item)",
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
+		price: 24.5,
 	},
 	{
 		id: "leek-2",
 		title: "Leek (This is a test item)",
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
+		price: 18,
 	},
 	{
 		id: "amog-2",
 		title: "Amog (This is a test item)",
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
+		price: 31.75,
 	},
 	{
 		id: "leek-3",
 		title: "Leek (This is a test item)",
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
+		price: 15.25,
 	},
 	{
 		id: "amog-3",
 		title: "Amog (This is a test item)",
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
+		price: 42,
 	},
 ];
 
