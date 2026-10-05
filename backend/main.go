@@ -5,8 +5,20 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	_ "adcompro-backend/docs"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// @title GemBid API
+// @version 1.0
+// @description REST API for the GemBid gemstone marketplace and auction platform.
+// @BasePath /
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter the JWT as: Bearer <token>
 func main() {
 	ConnectDatabase()
 	defer DB.Close()
@@ -16,6 +28,15 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+
+	// Swagger UI — FastAPI-style interactive API documentation.
+	mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/docs/index.html", http.StatusMovedPermanently)
+	})
+	mux.Handle("GET /docs/", httpSwagger.Handler(
+		httpSwagger.URL("/docs/doc.json"),
+		httpSwagger.PersistAuthorization(true),
+	))
 
 	mux.HandleFunc(
 		"GET /health",
@@ -158,6 +179,56 @@ func main() {
 		AuthMiddleware(
 			VerifiedSellerMiddleware(
 				DeleteListingHandler,
+			),
+		),
+	)
+
+	// ============================================================
+	// AUCTIONS
+	// ============================================================
+
+	// Verified seller configures an AUCTION draft listing.
+	mux.HandleFunc(
+		"POST /api/auctions",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				CreateAuctionHandler,
+			),
+		),
+	)
+
+	// Public — browse scheduled and active auctions.
+	mux.HandleFunc(
+		"GET /api/auctions",
+		ListAuctionsHandler,
+	)
+
+	// Public — one auction.
+	mux.HandleFunc(
+		"GET /api/auctions/{id}",
+		GetAuctionHandler,
+	)
+
+	// Public — auction bid history.
+	mux.HandleFunc(
+		"GET /api/auctions/{id}/bids",
+		ListAuctionBidsHandler,
+	)
+
+	// Logged-in user places a bid.
+	mux.HandleFunc(
+		"POST /api/auctions/{id}/bids",
+		AuthMiddleware(
+			PlaceBidHandler,
+		),
+	)
+
+	// Verified seller closes their ended auction.
+	mux.HandleFunc(
+		"POST /api/auctions/{id}/close",
+		AuthMiddleware(
+			VerifiedSellerMiddleware(
+				CloseAuctionHandler,
 			),
 		),
 	)

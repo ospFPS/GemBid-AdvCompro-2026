@@ -114,6 +114,17 @@ func AdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 // AdminSellerApplicationsHandler returns seller applications
 // for the admin dashboard.
+// AdminSellerApplicationsHandler godoc
+// @Summary List seller applications
+// @Description Admin-only endpoint to view seller applications.
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /api/admin/seller-applications [get]
 func AdminSellerApplicationsHandler(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -225,6 +236,22 @@ func AdminSellerApplicationsHandler(
 // or
 //
 // REJECT -> REJECTED
+// AdminReviewSellerHandler godoc
+// @Summary Review a seller application
+// @Description Admin approves or rejects a pending seller application.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Seller application ID"
+// @Param request body SellerReviewRequest true "APPROVE or REJECT"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 409 {string} string
+// @Router /api/admin/seller-applications/{id} [put]
 func AdminReviewSellerHandler(
 	w http.ResponseWriter,
 	r *http.Request,

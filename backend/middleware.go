@@ -108,6 +108,16 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// MeHandler godoc
+// @Summary Get current user
+// @Description Return the profile of the currently authenticated user.
+// @Tags Authentication
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} UserResponse
+// @Failure 401 {string} string
+// @Failure 404 {string} string
+// @Router /api/me [get]
 func MeHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(userIDKey).(int64)
 

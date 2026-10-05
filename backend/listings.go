@@ -36,6 +36,20 @@ type CreateListingRequest struct {
 	GemID int64 `json:"gem_id"`
 }
 
+// CreateListingHandler godoc
+// @Summary Create a draft listing
+// @Description Create a DRAFT listing for a gemstone owned by the authenticated verified seller.
+// @Tags Listings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateListingRequest true "Gem to list"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Router /api/listings [post]
 func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
 
@@ -128,6 +142,14 @@ type ListingListItem struct {
 	FixedPrice *float64 `json:"fixed_price"`
 }
 
+// ListListingsHandler godoc
+// @Summary Browse marketplace listings
+// @Description Public endpoint returning PUBLISHED and ACTIVE listings.
+// @Tags Listings
+// @Produce json
+// @Success 200 {array} ListingListItem
+// @Failure 500 {string} string
+// @Router /api/listings [get]
 func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := DB.Query(
 		r.Context(),
@@ -171,6 +193,16 @@ func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 // GET /api/listings/{id}  (public — single listing detail)
 // ============================================================
 
+// GetListingHandler godoc
+// @Summary Get listing details
+// @Description Return one listing by listing_id, including its current status.
+// @Tags Listings
+// @Produce json
+// @Param id path int true "Listing ID"
+// @Success 200 {object} ListingResponse
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Router /api/listings/{id} [get]
 func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 	listingID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
@@ -220,6 +252,21 @@ type PublishListingRequest struct {
 	FixedPrice *float64 `json:"fixed_price"`
 }
 
+// PublishListingHandler godoc
+// @Summary Publish or configure a draft listing
+// @Description For FIXED_PRICE, sets the price and publishes. For AUCTION, records AUCTION while leaving the listing DRAFT until POST /api/auctions supplies auction settings.
+// @Tags Listings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Listing ID"
+// @Param request body PublishListingRequest true "Sale type and optional fixed price"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 409 {string} string
+// @Router /api/listings/{id}/publish [put]
 func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
 
@@ -280,8 +327,8 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Sale type is recorded here, but the listing stays in DRAFT status —
-		// creating the actual auction (starting price, times, etc.) is a
-		// separate step that will move it to ACTIVE. Not built yet.
+		// creating the actual auction (starting price, increment, times, etc.) is a
+		// separate POST /api/auctions step that will publish or activate it.
 		err = DB.QueryRow(
 			r.Context(),
 			`
@@ -325,6 +372,20 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/listings/{id}  (seller-owned — only while still DRAFT)
 // ============================================================
 
+// DeleteListingHandler godoc
+// @Summary Delete a draft listing
+// @Description Delete a seller-owned listing only while it is still DRAFT.
+// @Tags Listings
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Listing ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 409 {string} string
+// @Router /api/listings/{id} [delete]
 func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
 

@@ -35,6 +35,18 @@ type UserResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// RegisterHandler godoc
+// @Summary Register a user
+// @Description Create a normal GemBid user account. Passwords are hashed before storage.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "Registration details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 409 {string} string
+// @Failure 500 {string} string
+// @Router /api/register [post]
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var request RegisterRequest
 
@@ -165,6 +177,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// LoginHandler godoc
+// @Summary Log in
+// @Description Authenticate a user and return a JWT bearer token.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login credentials"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /api/login [post]
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var request LoginRequest
 

@@ -5,9 +5,8 @@
 
 This document is a teammate handoff for the backend work completed so far.
 
-> Current decision: **stop before the Auction Engine**.  
-> The next active scope is to finish **Gem CRUD** and then build **fixed-price listings**.  
-> Auction creation, bidding, reserve logic, winner selection, and outbid notifications will be done later.
+> **Latest status (27 September 2026):** Gem CRUD and fixed-price listings are now implemented, and the core **Auction Engine** has also been built and integration-tested.  
+> Older sections below that say to stop before the Auction Engine are historical snapshots. See **Section 39 — Latest Update** for the current state.
 
 ---
 
@@ -1609,6 +1608,578 @@ PUBLISH
 MARKETPLACE
 
 ==============================
-STOP HERE BEFORE AUCTION ENGINE
+OLDER SNAPSHOT — SUPERSEDED
+See Section 39 for latest status
 ==============================
 ```
+---
+
+# 39. Latest Update — 27 September 2026
+
+> **This section is the newest project status and supersedes older notes in this handoff that say Gem CRUD, Listings, or the Auction Engine are still pending.**
+
+Today we completed and tested a large part of the backend.
+
+## 39.1 Seller Approval and Authorization Testing
+
+A fresh seller application was tested end-to-end.
+
+Confirmed flow:
+
+```text
+Register / Login
+      ↓
+Apply as Seller
+      ↓
+PENDING
+      ↓
+Admin Login
+      ↓
+Admin Approves Application
+      ↓
+VERIFIED
+```
+
+Confirmed result:
+
+```text
+seller_id = 2
+user_id = 3
+seller status = VERIFIED
+```
+
+The admin protection was also tested:
+
+```text
+Normal USER calling admin endpoint
+→ 403 Forbidden
+```
+
+So both seller verification and admin authorization are working.
+
+---
+
+## 39.2 Gem CRUD Status
+
+Gem CRUD is now implemented beyond the earlier snapshot.
+
+Current routes:
+
+```text
+GET    /api/gems
+POST   /api/gems
+GET    /api/gems/{id}
+PUT    /api/gems/{id}
+DELETE /api/gems/{id}
+```
+
+The following were tested successfully:
+
+```text
+POST /api/gems       → 201 Created
+GET  /api/gems       → 200 OK
+GET  /api/gems/{id}  → 200 OK
+PUT  /api/gems/{id}  → 200 OK
+```
+
+The update test confirmed that the changed values were stored and returned correctly.
+
+The DELETE handler is implemented, but the API DELETE route has not yet been fully integration-tested through the same end-to-end flow.
+
+Important ownership rule is implemented:
+
+```text
+Authenticated seller_id
+        ↓
+Gem seller_id
+        ↓
+Must match
+```
+
+---
+
+## 39.3 Listings Implemented
+
+New file:
+
+```text
+backend/listings.go
+```
+
+Current listing routes:
+
+```text
+POST   /api/listings
+GET    /api/listings
+GET    /api/listings/{id}
+PUT    /api/listings/{id}/publish
+DELETE /api/listings/{id}
+```
+
+Fixed-price listing flow was tested successfully:
+
+```text
+Gem
+ ↓
+Create Listing
+ ↓
+DRAFT
+ ↓
+Publish as FIXED_PRICE
+ ↓
+PUBLISHED
+ ↓
+Visible in public marketplace
+```
+
+A test listing was published with:
+
+```text
+fixed_price = 12500
+status = PUBLISHED
+```
+
+The public marketplace correctly excluded the listing while it was still DRAFT and included it after publishing.
+
+### Known listing issue found
+
+```text
+GET /api/listings/{id}
+```
+
+currently allows a public request to retrieve a DRAFT listing by ID.
+
+Recommended fix:
+
+```text
+Public user:
+PUBLISHED / ACTIVE → return listing
+DRAFT              → 404
+
+Owner seller:
+should still be able to view own draft through an authenticated seller flow
+```
+
+---
+
+## 39.4 Swagger Added
+
+Swagger / Swaggo is now integrated.
+
+Swagger URL:
+
+```text
+http://localhost:8080/docs
+```
+
+Generated files:
+
+```text
+backend/docs/docs.go
+backend/docs/swagger.json
+backend/docs/swagger.yaml
+```
+
+Swagger currently documents:
+
+```text
+Authentication
+Seller
+Admin
+Gems
+Listings
+Auctions
+```
+
+Protected endpoints use:
+
+```text
+Authorization: Bearer <JWT>
+```
+
+Swagger authorization and protected API testing were confirmed working.
+
+---
+
+## 39.5 Docker Added
+
+New files:
+
+```text
+backend/Dockerfile
+docker-compose.yml
+```
+
+Docker Compose validation passed:
+
+```powershell
+docker compose config --quiet
+```
+
+The backend remains exposed on:
+
+```text
+8080
+```
+
+---
+
+## 39.6 Auction Engine Started and Core Logic Implemented
+
+The previous decision to stop before the Auction Engine has now been superseded.
+
+New main file:
+
+```text
+backend/auction.go
+```
+
+Current auction routes:
+
+```text
+POST /api/auctions
+GET  /api/auctions
+GET  /api/auctions/{id}
+
+GET  /api/auctions/{id}/bids
+POST /api/auctions/{id}/bids
+
+POST /api/auctions/{id}/close
+```
+
+Auction flow:
+
+```text
+Gem
+ ↓
+DRAFT Listing
+ ↓
+Set sale_type = AUCTION
+ ↓
+Create Auction
+ ↓
+SCHEDULED / ACTIVE
+ ↓
+Users Bid
+ ↓
+Highest Bidder Updated
+ ↓
+Auction End Time
+ ↓
+Close Auction
+ ↓
+Reserve Reached?
+ ├── YES → Winner + SOLD
+ └── NO  → UNSOLD
+```
+
+Implemented auction rules:
+
+```text
+✅ Starting price
+✅ Minimum increment
+✅ Scheduled / active auction states
+✅ Current price
+✅ Current highest bidder
+✅ Winning bid tracking
+✅ Seller cannot bid on own auction
+✅ Too-low bids are rejected
+✅ Late bids are rejected
+✅ Previous highest bid becomes OUTBID
+✅ Reserve price check
+✅ Winner selection
+✅ Winning bid becomes WON
+✅ Listing becomes SOLD or UNSOLD
+✅ Auction cannot be closed twice
+```
+
+---
+
+## 39.7 Concurrency Protection for Bidding
+
+Bid placement uses a PostgreSQL transaction and:
+
+```sql
+FOR UPDATE
+```
+
+This locks the auction row while a bid is being processed.
+
+Example:
+
+```text
+Current = 5000
+
+Bidder A → 5500
+Bidder B → 5300
+```
+
+The first request updates the current price while the row is locked.
+
+The second request then checks the new price instead of using stale data.
+
+This prevents two simultaneous requests from both being accepted as the highest bid.
+
+---
+
+## 39.8 Automated Auction Integration Test
+
+New file:
+
+```text
+backend/auction_integration_test.go
+```
+
+This test creates temporary database records and performs a real two-bidder auction flow against Supabase.
+
+Test sequence:
+
+```text
+Seller tries to bid 5000
+→ 403 Forbidden ✅
+
+Bidder A → 5000
+→ ACCEPTED ✅
+
+Bidder B → 5100
+→ REJECTED because minimum is 5250 ✅
+
+Bidder B → 5250
+→ ACCEPTED ✅
+Bidder A old bid → OUTBID ✅
+
+Bidder A → 5500
+→ ACCEPTED ✅
+Bidder B old bid → OUTBID ✅
+
+Auction reaches end_time
+
+Bidder B → 5750
+→ REJECTED because auction ended ✅
+
+Seller closes auction
+
+Auction = ENDED ✅
+Winner = Bidder A ✅
+Final price = 5500 ✅
+Winning bid = WON ✅
+Listing = SOLD ✅
+```
+
+Actual test result:
+
+```text
+PASS auction=1 bidderA=5 bidderB=6 final_price=5500 winner=5 listing=SOLD
+--- PASS: TestAuctionEngineTwoBidderFlow
+PASS
+```
+
+Temporary integration-test records are cleaned up automatically after the test.
+
+Run the full integration test with:
+
+```powershell
+cd "D:\RAI\adcompro proj\backend"
+
+$env:RUN_AUCTION_INTEGRATION="1"
+go test -run TestAuctionEngineTwoBidderFlow -v
+```
+
+Normal test command:
+
+```powershell
+go test ./...
+```
+
+---
+
+## 39.9 Build and Static Checks
+
+The current code passed:
+
+```text
+gofmt              ✅
+go build .          ✅
+go test ./...       ✅
+go vet ./...        ✅
+Swagger generation  ✅
+Docker config       ✅
+```
+
+---
+
+## 39.10 Files Added Today
+
+Main new files:
+
+```text
+backend/gem_handlers.go
+backend/listings.go
+backend/auction.go
+backend/auction_integration_test.go
+backend/Dockerfile
+backend/docs/docs.go
+backend/docs/swagger.json
+backend/docs/swagger.yaml
+docker-compose.yml
+```
+
+Existing files modified include:
+
+```text
+backend/main.go
+backend/auth.go
+backend/admin.go
+backend/gem.go
+backend/middleware.go
+backend/seller.go
+backend/seller_middleware.go
+backend/go.mod
+backend/go.sum
+```
+
+No project file was intentionally deleted.
+
+---
+
+## 39.11 Git / GitHub Notes
+
+The real `.env` file is confirmed ignored by Git.
+
+```text
+.env → ignored
+```
+
+Do not commit:
+
+```text
+.env
+database passwords
+JWT secrets
+private credentials
+```
+
+A short repository `README.md` has also been prepared/added for GitHub.
+
+Before the backend push, line-ending-only migration changes and the generated local `.exe` build change were removed from the pending Git diff so they do not need to be included in the backend commit.
+
+The backend changes still need to be committed/pushed from the local project if that push has not already been run.
+
+---
+
+## 39.12 Current Backend Status
+
+Latest status:
+
+```text
+Database                    ✅
+Go ↔ Supabase               ✅
+Authentication              ✅
+JWT Middleware              ✅
+Seller Application          ✅
+Admin Seller Approval       ✅
+Verified Seller Middleware  ✅
+Gem Create                  ✅
+Gem Read                    ✅
+Gem Update                  ✅
+Gem Delete Handler          ✅
+Draft Listings              ✅
+Fixed-Price Listings        ✅
+Marketplace Browse          ✅
+Swagger                     ✅
+Docker Configuration        ✅
+Auction Creation            ✅
+Scheduled Auctions          ✅
+Active Auctions             ✅
+Bid Validation              ✅
+Minimum Increment           ✅
+Concurrency Protection      ✅
+Highest Bidder Tracking     ✅
+Outbid Handling             ✅
+Reserve Price               ✅
+Winner Selection            ✅
+SOLD / UNSOLD               ✅
+Auction Integration Test    ✅
+```
+
+Still pending:
+
+```text
+⬜ Automatic auction closing at end_time
+⬜ Automatic order creation for auction winner
+⬜ Notification system
+⬜ Payment / transaction workflow
+⬜ Shipping workflow
+⬜ Frontend integration
+⬜ Fix public access to DRAFT listing detail
+⬜ Full API test of DELETE /api/gems/{id}
+⬜ Ubuntu deployment
+```
+
+---
+
+## 39.13 New Immediate Next Steps
+
+Continue in this order:
+
+```text
+1. Implement automatic auction closing
+2. Automatically create an order for a successful auction winner
+3. Fix public GET /api/listings/{id} so DRAFT listings are private
+4. Add notifications / outbid notifications
+5. Continue order and transaction workflow
+6. Connect Next.js frontend
+7. Full end-to-end testing
+8. Docker / Ubuntu deployment
+```
+
+---
+
+# 40. Latest Workflow Snapshot
+
+```text
+REGISTER / LOGIN
+      ↓
+JWT
+      ↓
+NORMAL USER
+      ↓
+SELLER APPLICATION
+      ↓
+PENDING
+      ↓
+ADMIN REVIEW
+      ↓
+VERIFIED SELLER
+      ↓
+CREATE GEM
+      ↓
+GEM CRUD
+      ↓
+DRAFT LISTING
+      ↓
+      ├──────────────────────┐
+      ↓                      ↓
+FIXED PRICE               AUCTION
+      ↓                      ↓
+PUBLISH                  CREATE AUCTION
+      ↓                      ↓
+MARKETPLACE          SCHEDULED / ACTIVE
+                             ↓
+                           BIDS
+                             ↓
+                     HIGHEST BIDDER
+                             ↓
+                        AUCTION END
+                             ↓
+                       RESERVE CHECK
+                         ↓        ↓
+                       SOLD     UNSOLD
+
+NEXT:
+Automatic Auction Closing
+→ Winner Order Creation
+→ Notifications
+→ Frontend
+```
+

@@ -41,6 +41,20 @@ type SellerApplicationResponse struct {
 // POST /api/seller/apply
 // ============================================================
 
+// SellerApplyHandler godoc
+// @Summary Apply to become a seller
+// @Description Submit a seller application for the authenticated normal user.
+// @Tags Seller
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body SellerApplyRequest true "Seller application"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 409 {string} string
+// @Router /api/seller/apply [post]
 func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get logged-in user ID from JWT middleware.
@@ -276,6 +290,16 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 // GET /api/seller/status
 // ============================================================
 
+// SellerStatusHandler godoc
+// @Summary Get seller application status
+// @Description Return the authenticated user's seller status and application details when available.
+// @Tags Seller
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {string} string
+// @Failure 404 {string} string
+// @Router /api/seller/status [get]
 func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get logged-in user ID.

@@ -52,6 +52,20 @@ type GemResponse struct {
 // POST /api/gems
 // ============================================================
 
+// CreateGemHandler godoc
+// @Summary Create a gemstone
+// @Description Create a gemstone owned by the authenticated verified seller.
+// @Tags Gems
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateGemRequest true "Gemstone details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /api/gems [post]
 func CreateGemHandler(w http.ResponseWriter, r *http.Request) {
 
 	// seller_id was added by VerifiedSellerMiddleware.
