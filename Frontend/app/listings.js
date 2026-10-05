@@ -2,7 +2,7 @@ const mockItems = [
 	{
 		id: "leek-1",
 		title: "Leek (This is a test item)",
-		description: "A rare gem from the northern caves.",
+		description: "A rare gem from the northern caves. Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah",
 		image: "/assets/Leek.jpg",
 		price: 12.99,
 		pfp: "/assets/pfp.png",
@@ -142,4 +142,12 @@ export async function getListings({
 
 export async function getListingById(id) {
 	return mockItems.find((item) => item.id === id) ?? null;
+}
+
+export async function getAllListings() {
+	return mockItems;
+}
+
+export async function getMoreListings(excludedId, limit = 5) {
+	return mockItems.filter((item) => item.id !== excludedId).slice(0, limit);
 }
