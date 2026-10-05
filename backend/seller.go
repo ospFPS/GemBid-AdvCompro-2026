@@ -1,15 +1,13 @@
-package main
+package gembid
 
 import (
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
-)
 
-// ============================================================
-// SELLER APPLICATION REQUEST
-// ============================================================
+	"github.com/jackc/pgx/v5"
+)
 
 type SellerApplyRequest struct {
 	ShopName    string `json:"shop_name"`
@@ -18,10 +16,6 @@ type SellerApplyRequest struct {
 	Address     string `json:"address"`
 	Description string `json:"description"`
 }
-
-// ============================================================
-// SELLER APPLICATION RESPONSE
-// ============================================================
 
 type SellerApplicationResponse struct {
 	SellerID           int64      `json:"seller_id"`
@@ -37,87 +31,55 @@ type SellerApplicationResponse struct {
 	ReviewedBy         *int64     `json:"reviewed_by,omitempty"`
 }
 
-// ============================================================
-// POST /api/seller/apply
-// ============================================================
+func scanSellerApplication(row pgx.Row, application *SellerApplicationResponse) error {
+	return row.Scan(
+		&application.SellerID, &application.UserID, &application.ShopName,
+		&application.SellerType, &application.LegalName, &application.Address,
+		&application.Description, &application.VerificationStatus, &application.AppliedAt,
+		&application.ReviewedAt, &application.ReviewedBy,
+	)
+}
 
-// SellerApplyHandler godoc
-// @Summary Apply to become a seller
-// @Description Submit a seller application for the authenticated normal user.
-// @Tags Seller
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body SellerApplyRequest true "Seller application"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 409 {string} string
-// @Router /api/seller/apply [post]
 func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Get logged-in user ID from JWT middleware.
 	userID, ok := r.Context().Value(userIDKey).(int64)
 
 	if !ok {
-		http.Error(
-			w,
-			"Unauthorized",
-			http.StatusUnauthorized,
-		)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Read JSON body.
 	var request SellerApplyRequest
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(
-			w,
-			"Invalid JSON",
-			http.StatusBadRequest,
-		)
+	if err := decodeJSON(r, &request); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Clean input.
 	request.ShopName = strings.TrimSpace(request.ShopName)
 	request.SellerType = strings.TrimSpace(request.SellerType)
 	request.LegalName = strings.TrimSpace(request.LegalName)
 	request.Address = strings.TrimSpace(request.Address)
 	request.Description = strings.TrimSpace(request.Description)
 
-	// Required fields.
 	if request.ShopName == "" || request.LegalName == "" {
-		http.Error(
-			w,
-			"shop_name and legal_name are required",
-			http.StatusBadRequest,
-		)
+		http.Error(w, "shop_name and legal_name are required", http.StatusBadRequest)
+		return
+	}
+	if len(request.ShopName) > 150 || len(request.SellerType) > 50 || len(request.LegalName) > 150 ||
+		len(request.Address) > 2000 || len(request.Description) > 5000 {
+		http.Error(w, "seller application contains a field that is too long", http.StatusBadRequest)
 		return
 	}
 
-	// Start transaction.
 	tx, err := DB.Begin(r.Context())
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not start database transaction",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not start database transaction", http.StatusInternalServerError)
 		return
 	}
 
 	defer tx.Rollback(r.Context())
-
-	// ========================================================
-	// CHECK USER STATUS
-	// ========================================================
 
 	var role string
 	var sellerStatus string
@@ -133,47 +95,26 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 		FOR UPDATE
 		`,
 		userID,
-	).Scan(
-		&role,
-		&sellerStatus,
-	)
+	).Scan(&role, &sellerStatus)
 
 	if err != nil {
-		http.Error(
-			w,
-			"User not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// Admins do not submit normal seller applications.
 	if role != "USER" {
-		http.Error(
-			w,
-			"Only normal users can apply to become sellers",
-			http.StatusForbidden,
-		)
+		http.Error(w, "Only normal users can apply to become sellers", http.StatusForbidden)
 		return
 	}
 
-	// User must not already have an application.
 	if sellerStatus != "NONE" {
-		http.Error(
-			w,
-			"Seller application is not available for this account",
-			http.StatusConflict,
-		)
+		http.Error(w, "Seller application is not available for this account", http.StatusConflict)
 		return
 	}
-
-	// ========================================================
-	// CREATE SELLER PROFILE
-	// ========================================================
 
 	var application SellerApplicationResponse
 
-	err = tx.QueryRow(
+	err = scanSellerApplication(tx.QueryRow(
 		r.Context(),
 		`
 		INSERT INTO public.seller_profiles (
@@ -211,32 +152,12 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 		request.LegalName,
 		request.Address,
 		request.Description,
-	).Scan(
-		&application.SellerID,
-		&application.UserID,
-		&application.ShopName,
-		&application.SellerType,
-		&application.LegalName,
-		&application.Address,
-		&application.Description,
-		&application.VerificationStatus,
-		&application.AppliedAt,
-		&application.ReviewedAt,
-		&application.ReviewedBy,
-	)
+	), &application)
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not create seller application",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not create seller application", http.StatusInternalServerError)
 		return
 	}
-
-	// ========================================================
-	// UPDATE USER SELLER STATUS
-	// ========================================================
 
 	_, err = tx.Exec(
 		r.Context(),
@@ -249,32 +170,16 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not update seller status",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not update seller status", http.StatusInternalServerError)
 		return
 	}
-
-	// ========================================================
-	// COMMIT
-	// ========================================================
 
 	if err := tx.Commit(r.Context()); err != nil {
-		http.Error(
-			w,
-			"Could not complete seller application",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not complete seller application", http.StatusInternalServerError)
 		return
 	}
 
-	// Return response.
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
+	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusCreated)
 
@@ -286,37 +191,17 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// ============================================================
-// GET /api/seller/status
-// ============================================================
-
-// SellerStatusHandler godoc
-// @Summary Get seller application status
-// @Description Return the authenticated user's seller status and application details when available.
-// @Tags Seller
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {string} string
-// @Failure 404 {string} string
-// @Router /api/seller/status [get]
 func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Get logged-in user ID.
 	userID, ok := r.Context().Value(userIDKey).(int64)
 
 	if !ok {
-		http.Error(
-			w,
-			"Unauthorized",
-			http.StatusUnauthorized,
-		)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	var sellerStatus string
 
-	// Get seller status from users table.
 	err := DB.QueryRow(
 		r.Context(),
 		`
@@ -328,20 +213,12 @@ func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&sellerStatus)
 
 	if err != nil {
-		http.Error(
-			w,
-			"User not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// User has never applied.
 	if sellerStatus == "NONE" {
-		w.Header().Set(
-			"Content-Type",
-			"application/json",
-		)
+		w.Header().Set("Content-Type", "application/json")
 
 		json.NewEncoder(w).Encode(
 			map[string]interface{}{
@@ -353,13 +230,9 @@ func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ========================================================
-	// LOAD SELLER PROFILE
-	// ========================================================
-
 	var application SellerApplicationResponse
 
-	err = DB.QueryRow(
+	err = scanSellerApplication(DB.QueryRow(
 		r.Context(),
 		`
 		SELECT
@@ -378,37 +251,14 @@ func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE user_id = $1
 		`,
 		userID,
-	).Scan(
-		&application.SellerID,
-		&application.UserID,
-		&application.ShopName,
-		&application.SellerType,
-		&application.LegalName,
-		&application.Address,
-		&application.Description,
-		&application.VerificationStatus,
-		&application.AppliedAt,
-		&application.ReviewedAt,
-		&application.ReviewedBy,
-	)
+	), &application)
 
 	if err != nil {
-		http.Error(
-			w,
-			"Seller profile not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "Seller profile not found", http.StatusNotFound)
 		return
 	}
 
-	// ========================================================
-	// RETURN STATUS
-	// ========================================================
-
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
+	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(
 		map[string]interface{}{

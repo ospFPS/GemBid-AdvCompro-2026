@@ -1,19 +1,13 @@
-package main
+package gembid
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
-
-// ============================================================
-// HELPER
-// ============================================================
 
 func cleanAndValidateGemRequest(request *CreateGemRequest) string {
 	request.GemName = strings.TrimSpace(request.GemName)
@@ -32,38 +26,40 @@ func cleanAndValidateGemRequest(request *CreateGemRequest) string {
 	if request.GemType == "" {
 		return "gem_type is required"
 	}
-
-	if request.Carat != nil && *request.Carat <= 0 {
-		return "carat must be greater than 0"
+	if len(request.GemName) > 150 || len(request.GemType) > 100 ||
+		len(request.Shape) > 100 || len(request.Color) > 100 || len(request.Clarity) > 100 ||
+		len(request.Origin) > 150 || len(request.Treatment) > 150 || len(request.Description) > 5000 {
+		return "gem field is too long"
 	}
 
-	if request.Length != nil && *request.Length <= 0 {
-		return "length must be greater than 0"
+	if request.Carat != nil && (*request.Carat <= 0 || *request.Carat > 9999999.999) {
+		return "carat must be greater than 0 and within database range"
 	}
 
-	if request.Width != nil && *request.Width <= 0 {
-		return "width must be greater than 0"
+	if request.Length != nil && (*request.Length <= 0 || *request.Length > 99999999.99) {
+		return "length must be greater than 0 and within database range"
 	}
 
-	if request.Height != nil && *request.Height <= 0 {
-		return "height must be greater than 0"
+	if request.Width != nil && (*request.Width <= 0 || *request.Width > 99999999.99) {
+		return "width must be greater than 0 and within database range"
+	}
+
+	if request.Height != nil && (*request.Height <= 0 || *request.Height > 99999999.99) {
+		return "height must be greater than 0 and within database range"
 	}
 
 	return ""
 }
 
-// ============================================================
-// GET /api/gems
-// ============================================================
+func scanGem(row pgx.Row, gem *GemResponse) error {
+	return row.Scan(
+		&gem.GemID, &gem.SellerID, &gem.GemName, &gem.GemType,
+		&gem.Carat, &gem.Length, &gem.Width, &gem.Height,
+		&gem.Shape, &gem.Color, &gem.Clarity, &gem.Origin,
+		&gem.Treatment, &gem.Description, &gem.CreatedAt, &gem.UpdatedAt,
+	)
+}
 
-// ListGemsHandler godoc
-// @Summary List gemstones
-// @Description Return all gemstone records.
-// @Tags Gems
-// @Produce json
-// @Success 200 {array} GemResponse
-// @Failure 500 {string} string
-// @Router /api/gems [get]
 func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := DB.Query(
@@ -92,11 +88,7 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not fetch gems",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not fetch gems", http.StatusInternalServerError)
 		return
 	}
 
@@ -108,31 +100,10 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 
 		var gem GemResponse
 
-		err := rows.Scan(
-			&gem.GemID,
-			&gem.SellerID,
-			&gem.GemName,
-			&gem.GemType,
-			&gem.Carat,
-			&gem.Length,
-			&gem.Width,
-			&gem.Height,
-			&gem.Shape,
-			&gem.Color,
-			&gem.Clarity,
-			&gem.Origin,
-			&gem.Treatment,
-			&gem.Description,
-			&gem.CreatedAt,
-			&gem.UpdatedAt,
-		)
+		err := scanGem(rows, &gem)
 
 		if err != nil {
-			http.Error(
-				w,
-				"Could not read gem data",
-				http.StatusInternalServerError,
-			)
+			http.Error(w, "Could not read gem data", http.StatusInternalServerError)
 			return
 		}
 
@@ -140,11 +111,7 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := rows.Err(); err != nil {
-		http.Error(
-			w,
-			"Could not finish reading gems",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not finish reading gems", http.StatusInternalServerError)
 		return
 	}
 
@@ -153,41 +120,18 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(gems)
 }
 
-// ============================================================
-// GET /api/gems/{id}
-// ============================================================
-
-// GetGemHandler godoc
-// @Summary Get a gemstone
-// @Description Return one gemstone by gem_id.
-// @Tags Gems
-// @Produce json
-// @Param id path int true "Gem ID"
-// @Success 200 {object} GemResponse
-// @Failure 400 {string} string
-// @Failure 404 {string} string
-// @Failure 500 {string} string
-// @Router /api/gems/{id} [get]
 func GetGemHandler(w http.ResponseWriter, r *http.Request) {
 
-	gemID, err := strconv.ParseInt(
-		r.PathValue("id"),
-		10,
-		64,
-	)
+	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
 	if err != nil || gemID <= 0 {
-		http.Error(
-			w,
-			"Invalid gem ID",
-			http.StatusBadRequest,
-		)
+		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
 
 	var gem GemResponse
 
-	err = DB.QueryRow(
+	err = scanGem(DB.QueryRow(
 		r.Context(),
 		`
 		SELECT
@@ -211,40 +155,15 @@ func GetGemHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE gem_id = $1
 		`,
 		gemID,
-	).Scan(
-		&gem.GemID,
-		&gem.SellerID,
-		&gem.GemName,
-		&gem.GemType,
-		&gem.Carat,
-		&gem.Length,
-		&gem.Width,
-		&gem.Height,
-		&gem.Shape,
-		&gem.Color,
-		&gem.Clarity,
-		&gem.Origin,
-		&gem.Treatment,
-		&gem.Description,
-		&gem.CreatedAt,
-		&gem.UpdatedAt,
-	)
+	), &gem)
 
 	if err == pgx.ErrNoRows {
-		http.Error(
-			w,
-			"Gem not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "Gem not found", http.StatusNotFound)
 		return
 	}
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not fetch gem",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not fetch gem", http.StatusInternalServerError)
 		return
 	}
 
@@ -253,81 +172,33 @@ func GetGemHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(gem)
 }
 
-// ============================================================
-// PUT /api/gems/{id}
-// ============================================================
-
-// UpdateGemHandler godoc
-// @Summary Update a gemstone
-// @Description Update a gemstone owned by the authenticated verified seller.
-// @Tags Gems
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Gem ID"
-// @Param request body CreateGemRequest true "Updated gemstone details"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Failure 500 {string} string
-// @Router /api/gems/{id} [put]
 func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 
 	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
 
 	if !ok {
-		http.Error(
-			w,
-			"Verified seller account required",
-			http.StatusForbidden,
-		)
+		http.Error(w, "Verified seller account required", http.StatusForbidden)
 		return
 	}
 
-	gemID, err := strconv.ParseInt(
-		r.PathValue("id"),
-		10,
-		64,
-	)
+	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
 	if err != nil || gemID <= 0 {
-		http.Error(
-			w,
-			"Invalid gem ID",
-			http.StatusBadRequest,
-		)
+		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
 
 	var request CreateGemRequest
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(
-			w,
-			"Invalid JSON",
-			http.StatusBadRequest,
-		)
+	if err := decodeJSON(r, &request); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	if validationError := cleanAndValidateGemRequest(&request); validationError != "" {
-		http.Error(
-			w,
-			validationError,
-			http.StatusBadRequest,
-		)
+		http.Error(w, validationError, http.StatusBadRequest)
 		return
 	}
-
-	// --------------------------------------------------------
-	// Check ownership and whether the gem is locked
-	// --------------------------------------------------------
 
 	var ownerID int64
 	var locked bool
@@ -358,48 +229,28 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == pgx.ErrNoRows {
-		http.Error(
-			w,
-			"Gem not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "Gem not found", http.StatusNotFound)
 		return
 	}
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not verify gem",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not verify gem", http.StatusInternalServerError)
 		return
 	}
 
 	if ownerID != sellerID {
-		http.Error(
-			w,
-			"You do not own this gem",
-			http.StatusForbidden,
-		)
+		http.Error(w, "You do not own this gem", http.StatusForbidden)
 		return
 	}
 
 	if locked {
-		http.Error(
-			w,
-			"Gem cannot be edited while it has a published, active, sold, or suspended listing",
-			http.StatusConflict,
-		)
+		http.Error(w, "Gem cannot be edited while it has a published, active, sold, or suspended listing", http.StatusConflict)
 		return
 	}
 
-	// --------------------------------------------------------
-	// Update gem
-	// --------------------------------------------------------
-
 	var gem GemResponse
 
-	err = DB.QueryRow(
+	err = scanGem(DB.QueryRow(
 		r.Context(),
 		`
 		UPDATE public.gems
@@ -451,31 +302,10 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 		request.Description,
 		gemID,
 		sellerID,
-	).Scan(
-		&gem.GemID,
-		&gem.SellerID,
-		&gem.GemName,
-		&gem.GemType,
-		&gem.Carat,
-		&gem.Length,
-		&gem.Width,
-		&gem.Height,
-		&gem.Shape,
-		&gem.Color,
-		&gem.Clarity,
-		&gem.Origin,
-		&gem.Treatment,
-		&gem.Description,
-		&gem.CreatedAt,
-		&gem.UpdatedAt,
-	)
+	), &gem)
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not update gem",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not update gem", http.StatusInternalServerError)
 		return
 	}
 
@@ -489,56 +319,21 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// ============================================================
-// DELETE /api/gems/{id}
-// ============================================================
-
-// DeleteGemHandler godoc
-// @Summary Delete a gemstone
-// @Description Delete a gemstone owned by the authenticated verified seller if it is not referenced by another record.
-// @Tags Gems
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Gem ID"
-// @Success 200 {object} map[string]string
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Failure 500 {string} string
-// @Router /api/gems/{id} [delete]
 func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 
 	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
 
 	if !ok {
-		http.Error(
-			w,
-			"Verified seller account required",
-			http.StatusForbidden,
-		)
+		http.Error(w, "Verified seller account required", http.StatusForbidden)
 		return
 	}
 
-	gemID, err := strconv.ParseInt(
-		r.PathValue("id"),
-		10,
-		64,
-	)
+	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
 	if err != nil || gemID <= 0 {
-		http.Error(
-			w,
-			"Invalid gem ID",
-			http.StatusBadRequest,
-		)
+		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
-
-	// --------------------------------------------------------
-	// Check gem and owner
-	// --------------------------------------------------------
 
 	var ownerID int64
 
@@ -553,35 +348,19 @@ func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&ownerID)
 
 	if err == pgx.ErrNoRows {
-		http.Error(
-			w,
-			"Gem not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "Gem not found", http.StatusNotFound)
 		return
 	}
 
 	if err != nil {
-		http.Error(
-			w,
-			"Could not verify gem",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not verify gem", http.StatusInternalServerError)
 		return
 	}
 
 	if ownerID != sellerID {
-		http.Error(
-			w,
-			"You do not own this gem",
-			http.StatusForbidden,
-		)
+		http.Error(w, "You do not own this gem", http.StatusForbidden)
 		return
 	}
-
-	// --------------------------------------------------------
-	// Delete
-	// --------------------------------------------------------
 
 	_, err = DB.Exec(
 		r.Context(),
@@ -596,24 +375,13 @@ func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 
-		var pgErr *pgconn.PgError
+		if isPGError(err, "23503") {
 
-		if errors.As(err, &pgErr) &&
-			pgErr.Code == "23503" {
-
-			http.Error(
-				w,
-				"Gem cannot be deleted because it is referenced by a listing or another record",
-				http.StatusConflict,
-			)
+			http.Error(w, "Gem cannot be deleted because it is referenced by a listing or another record", http.StatusConflict)
 			return
 		}
 
-		http.Error(
-			w,
-			"Could not delete gem",
-			http.StatusInternalServerError,
-		)
+		http.Error(w, "Could not delete gem", http.StatusInternalServerError)
 		return
 	}
 

@@ -1,8 +1,10 @@
-package main
+package gembid
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,17 +17,28 @@ type contextKey string
 
 const userIDKey contextKey = "user_id"
 
+func decodeJSON(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain one JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		authHeader := r.Header.Get("Authorization")
 
 		if authHeader == "" {
-			http.Error(
-				w,
-				"Authorization header required",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Authorization header required", http.StatusUnauthorized)
 			return
 		}
 
@@ -34,11 +47,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if len(parts) != 2 ||
 			!strings.EqualFold(parts[0], "Bearer") {
 
-			http.Error(
-				w,
-				"Invalid authorization header",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Invalid authorization header", http.StatusUnauthorized)
 			return
 		}
 
@@ -48,76 +57,40 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		token, err := jwt.Parse(
 			tokenString,
-			func(token *jwt.Token) (interface{}, error) {
-				return []byte(jwtSecret), nil
-			},
-			jwt.WithValidMethods(
-				[]string{jwt.SigningMethodHS256.Alg()},
-			),
+			func(_ *jwt.Token) (any, error) { return []byte(jwtSecret), nil },
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		)
 
 		if err != nil || !token.Valid {
-			http.Error(
-				w,
-				"Invalid or expired token",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 
 		if !ok {
-			http.Error(
-				w,
-				"Invalid token",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		subject, err := claims.GetSubject()
 
 		if err != nil {
-			http.Error(
-				w,
-				"Invalid token subject",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Invalid token subject", http.StatusUnauthorized)
 			return
 		}
 
 		userID, err := strconv.ParseInt(subject, 10, 64)
 
 		if err != nil {
-			http.Error(
-				w,
-				"Invalid user ID",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Invalid user ID", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(
-			r.Context(),
-			userIDKey,
-			userID,
-		)
-
-		next(w, r.WithContext(ctx))
+		next(w, r.WithContext(context.WithValue(r.Context(), userIDKey, userID)))
 	}
 }
 
-// MeHandler godoc
-// @Summary Get current user
-// @Description Return the profile of the currently authenticated user.
-// @Tags Authentication
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} UserResponse
-// @Failure 401 {string} string
-// @Failure 404 {string} string
-// @Router /api/me [get]
 func MeHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(userIDKey).(int64)
 
@@ -133,6 +106,7 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		`
 		SELECT
 			user_id,
+			username,
 			full_name,
 			email,
 			phone,
@@ -145,6 +119,7 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		userID,
 	).Scan(
 		&user.UserID,
+		&user.Username,
 		&user.FullName,
 		&user.Email,
 		&user.Phone,
@@ -154,11 +129,7 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(
-			w,
-			"User not found",
-			http.StatusNotFound,
-		)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 

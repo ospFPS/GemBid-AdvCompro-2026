@@ -1,4 +1,4 @@
-package main
+package gembid
 
 import (
 	"context"
@@ -15,75 +15,34 @@ func VerifiedSellerMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		userID, ok := r.Context().Value(userIDKey).(int64)
 
 		if !ok {
-			http.Error(
-				w,
-				"Unauthorized",
-				http.StatusUnauthorized,
-			)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		var sellerID int64
-		var userSellerStatus string
-		var profileStatus string
-
 		err := DB.QueryRow(
 			r.Context(),
 			`
-			SELECT
-				sp.seller_id,
-				u.seller_status,
-				sp.verification_status
+			SELECT sp.seller_id
 			FROM public.users u
-			INNER JOIN public.seller_profiles sp
-				ON sp.user_id = u.user_id
+			INNER JOIN public.seller_profiles sp ON sp.user_id = u.user_id
 			WHERE u.user_id = $1
+			  AND u.seller_status = 'VERIFIED'
+			  AND sp.verification_status = 'VERIFIED'
 			`,
 			userID,
-		).Scan(
-			&sellerID,
-			&userSellerStatus,
-			&profileStatus,
-		)
+		).Scan(&sellerID)
 
 		if err == pgx.ErrNoRows {
-			http.Error(
-				w,
-				"Verified seller account required",
-				http.StatusForbidden,
-			)
+			http.Error(w, "Verified seller account required", http.StatusForbidden)
 			return
 		}
 
 		if err != nil {
-			http.Error(
-				w,
-				"Could not verify seller account",
-				http.StatusInternalServerError,
-			)
+			http.Error(w, "Could not verify seller account", http.StatusInternalServerError)
 			return
 		}
 
-		if userSellerStatus != "VERIFIED" ||
-			profileStatus != "VERIFIED" {
-
-			http.Error(
-				w,
-				"Verified seller account required",
-				http.StatusForbidden,
-			)
-			return
-		}
-
-		ctx := context.WithValue(
-			r.Context(),
-			sellerIDKey,
-			sellerID,
-		)
-
-		next(
-			w,
-			r.WithContext(ctx),
-		)
+		next(w, r.WithContext(context.WithValue(r.Context(), sellerIDKey, sellerID)))
 	}
 }

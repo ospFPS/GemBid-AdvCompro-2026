@@ -1,6 +1,7 @@
-package main
+package test
 
 import (
+	. "adcompro-backend"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,12 +15,18 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type httpTestResponse struct {
 	Status int
 	Body   []byte
+}
+
+func requireHTTPStatus(t *testing.T, action string, resp httpTestResponse, want int) {
+	t.Helper()
+	if resp.Status != want {
+		t.Fatalf("%s: expected %d, got %d: %s", action, want, resp.Status, resp.Body)
+	}
 }
 
 func TestAuctionEngineTwoBidderFlow(t *testing.T) {
@@ -49,43 +56,26 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 		t.Fatalf("need one verified seller in test database: %v", err)
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte("integration-only"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	suffix := time.Now().UnixNano()
-	var bidderAID, bidderBID int64
-
-	err = DB.QueryRow(
-		ctx,
-		`
-		INSERT INTO public.users (full_name, email, password_hash)
-		VALUES ($1, $2, $3)
-		RETURNING user_id
-		`,
-		"Auction Integration Bidder A",
-		fmt.Sprintf("auction-it-a-%d@test.local", suffix),
-		string(passwordHash),
-	).Scan(&bidderAID)
-	if err != nil {
-		t.Fatalf("create bidder A: %v", err)
+	bidderIDs := make([]int64, 2)
+	for i, label := range []string{"A", "B"} {
+		err = DB.QueryRow(
+			ctx,
+			`
+			INSERT INTO public.users (username, full_name, email, password_hash)
+			VALUES ($1, $2, $3, $4)
+			RETURNING user_id
+			`,
+			fmt.Sprintf("ait%d_%d", i, suffix%1000000000),
+			"Auction Integration Bidder "+label,
+			fmt.Sprintf("auction-it-%d-%d@test.local", i, suffix),
+			"integration-only",
+		).Scan(&bidderIDs[i])
+		if err != nil {
+			t.Fatalf("create bidder %s: %v", label, err)
+		}
 	}
-
-	err = DB.QueryRow(
-		ctx,
-		`
-		INSERT INTO public.users (full_name, email, password_hash)
-		VALUES ($1, $2, $3)
-		RETURNING user_id
-		`,
-		"Auction Integration Bidder B",
-		fmt.Sprintf("auction-it-b-%d@test.local", suffix),
-		string(passwordHash),
-	).Scan(&bidderBID)
-	if err != nil {
-		t.Fatalf("create bidder B: %v", err)
-	}
+	bidderAID, bidderBID := bidderIDs[0], bidderIDs[1]
 
 	var gemID int64
 	err = DB.QueryRow(
@@ -125,6 +115,11 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx := context.Background()
 
+		_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.notifications WHERE auction_id = $1 OR listing_id = $2 OR user_id = ANY($3)`,
+			auctionID, listingID, []int64{bidderAID, bidderBID})
+		_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.transactions WHERE order_id IN (SELECT order_id FROM public.orders WHERE listing_id = $1)`,
+			listingID)
+		_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.orders WHERE listing_id = $1`, listingID)
 		if auctionID != 0 {
 			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.bids WHERE auction_id = $1`, auctionID)
 			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.auctions WHERE auction_id = $1`, auctionID)
@@ -135,21 +130,12 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	})
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(
-		"POST /api/auctions",
-		AuthMiddleware(VerifiedSellerMiddleware(CreateAuctionHandler)),
-	)
+	mux.HandleFunc("POST /api/auctions", AuthMiddleware(VerifiedSellerMiddleware(CreateAuctionHandler)))
 	mux.HandleFunc("GET /api/auctions", ListAuctionsHandler)
 	mux.HandleFunc("GET /api/auctions/{id}", GetAuctionHandler)
 	mux.HandleFunc("GET /api/auctions/{id}/bids", ListAuctionBidsHandler)
-	mux.HandleFunc(
-		"POST /api/auctions/{id}/bids",
-		AuthMiddleware(PlaceBidHandler),
-	)
-	mux.HandleFunc(
-		"POST /api/auctions/{id}/close",
-		AuthMiddleware(VerifiedSellerMiddleware(CloseAuctionHandler)),
-	)
+	mux.HandleFunc("POST /api/auctions/{id}/bids", AuthMiddleware(PlaceBidHandler))
+	mux.HandleFunc("POST /api/auctions/{id}/close", AuthMiddleware(VerifiedSellerMiddleware(CloseAuctionHandler)))
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -175,9 +161,7 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 			"end_time":          endTime,
 		},
 	)
-	if createResp.Status != http.StatusCreated {
-		t.Fatalf("create auction: expected 201, got %d: %s", createResp.Status, createResp.Body)
-	}
+	requireHTTPStatus(t, "create auction", createResp, http.StatusCreated)
 
 	var created struct {
 		Auction AuctionResponse `json:"auction"`
@@ -203,78 +187,75 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 		t.Fatalf("expected ACTIVE listing, got %s", listingStatus)
 	}
 
-	sellerBid := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		sellerToken,
-		map[string]any{"bid_amount": 5000.0},
-	)
-	if sellerBid.Status != http.StatusForbidden {
-		t.Fatalf("seller self-bid should be 403, got %d: %s", sellerBid.Status, sellerBid.Body)
+	auctionURL := fmt.Sprintf("%s/api/auctions/%d", server.URL, auctionID)
+	bidURL := auctionURL + "/bids"
+	closeURL := auctionURL + "/close"
+	for _, tc := range []struct {
+		name   string
+		token  string
+		amount float64
+		status int
+	}{
+		{"seller self-bid", sellerToken, 5000, http.StatusForbidden},
+		{"bidder A first bid", bidderAToken, 5000, http.StatusCreated},
+		{"too-low bid", bidderBToken, 5100, http.StatusConflict},
+		{"bidder B valid bid", bidderBToken, 5250, http.StatusCreated},
+		{"bidder A final bid", bidderAToken, 5500, http.StatusCreated},
+	} {
+		resp := integrationRequest(t, http.MethodPost, bidURL, tc.token, map[string]any{"bid_amount": tc.amount})
+		requireHTTPStatus(t, tc.name, resp, tc.status)
 	}
 
-	aFirst := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		bidderAToken,
-		map[string]any{"bid_amount": 5000.0},
-	)
-	if aFirst.Status != http.StatusCreated {
-		t.Fatalf("bidder A first bid: expected 201, got %d: %s", aFirst.Status, aFirst.Body)
+	type bidResult struct {
+		amount float64
+		resp   httpTestResponse
+		err    error
 	}
-
-	bTooLow := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		bidderBToken,
-		map[string]any{"bid_amount": 5100.0},
-	)
-	if bTooLow.Status != http.StatusConflict {
-		t.Fatalf("too-low bid should be 409, got %d: %s", bTooLow.Status, bTooLow.Body)
+	results := make(chan bidResult, 2)
+	start := make(chan struct{})
+	for _, tc := range []struct {
+		token  string
+		amount float64
+	}{
+		{bidderBToken, 5750},
+		{bidderAToken, 6000},
+	} {
+		go func(token string, amount float64) {
+			<-start
+			resp, err := integrationRequestRaw(http.MethodPost, bidURL, token, map[string]any{"bid_amount": amount})
+			results <- bidResult{amount: amount, resp: resp, err: err}
+		}(tc.token, tc.amount)
 	}
+	close(start)
 
-	bValid := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		bidderBToken,
-		map[string]any{"bid_amount": 5250.0},
-	)
-	if bValid.Status != http.StatusCreated {
-		t.Fatalf("bidder B valid bid: expected 201, got %d: %s", bValid.Status, bValid.Body)
-	}
-
-	aFinal := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		bidderAToken,
-		map[string]any{"bid_amount": 5500.0},
-	)
-	if aFinal.Status != http.StatusCreated {
-		t.Fatalf("bidder A final bid: expected 201, got %d: %s", aFinal.Status, aFinal.Body)
+	for range 2 {
+		result := <-results
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		if result.amount == 6000 && result.resp.Status != http.StatusCreated {
+			t.Fatalf("highest concurrent bid: expected %d, got %d: %s", http.StatusCreated, result.resp.Status, result.resp.Body)
+		}
+		if result.amount == 5750 && result.resp.Status != http.StatusCreated && result.resp.Status != http.StatusConflict {
+			t.Fatalf("lower concurrent bid: expected %d or %d, got %d: %s", http.StatusCreated, http.StatusConflict, result.resp.Status, result.resp.Body)
+		}
 	}
 
 	auctionResp := integrationRequest(
 		t,
 		http.MethodGet,
-		fmt.Sprintf("%s/api/auctions/%d", server.URL, auctionID),
+		auctionURL,
 		"",
 		nil,
 	)
-	if auctionResp.Status != http.StatusOK {
-		t.Fatalf("get auction: expected 200, got %d: %s", auctionResp.Status, auctionResp.Body)
-	}
+	requireHTTPStatus(t, "get auction", auctionResp, http.StatusOK)
 
 	var auction AuctionResponse
 	if err := json.Unmarshal(auctionResp.Body, &auction); err != nil {
 		t.Fatal(err)
 	}
-	if auction.CurrentPrice != 5500 {
-		t.Fatalf("expected current price 5500, got %.2f", auction.CurrentPrice)
+	if auction.CurrentPrice != 6000 {
+		t.Fatalf("expected current price 6000 after concurrent bids, got %.2f", auction.CurrentPrice)
 	}
 	if auction.CurrentHighestBidderID == nil || *auction.CurrentHighestBidderID != bidderAID {
 		t.Fatalf("expected bidder A (%d) to be highest, got %v", bidderAID, auction.CurrentHighestBidderID)
@@ -283,56 +264,43 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	bidsResp := integrationRequest(
 		t,
 		http.MethodGet,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
+		bidURL,
 		"",
 		nil,
 	)
-	if bidsResp.Status != http.StatusOK {
-		t.Fatalf("get bids: expected 200, got %d: %s", bidsResp.Status, bidsResp.Body)
-	}
+	requireHTTPStatus(t, "get bids", bidsResp, http.StatusOK)
 
 	var bids []BidResponse
 	if err := json.Unmarshal(bidsResp.Body, &bids); err != nil {
 		t.Fatal(err)
 	}
-	if len(bids) != 3 {
-		t.Fatalf("expected 3 accepted bids in history, got %d", len(bids))
+	if len(bids) < 4 || len(bids) > 5 {
+		t.Fatalf("expected 4 or 5 accepted bids after concurrent burst, got %d", len(bids))
 	}
-	if bids[0].BidderID != bidderAID || bids[0].BidAmount != 5500 || bids[0].BidStatus != "ACCEPTED" {
-		t.Fatalf("unexpected latest bid: %+v", bids[0])
+	if bids[0].BidderID != bidderAID || bids[0].BidAmount != 6000 || bids[0].BidStatus != "ACCEPTED" {
+		t.Fatalf("unexpected winning concurrent bid: %+v", bids[0])
 	}
-	if bids[1].BidderID != bidderBID || bids[1].BidAmount != 5250 || bids[1].BidStatus != "OUTBID" {
-		t.Fatalf("unexpected second bid: %+v", bids[1])
-	}
-	if bids[2].BidderID != bidderAID || bids[2].BidAmount != 5000 || bids[2].BidStatus != "OUTBID" {
-		t.Fatalf("unexpected first bid: %+v", bids[2])
+	for _, bid := range bids[1:] {
+		if bid.BidStatus == "ACCEPTED" {
+			t.Fatalf("only the highest bid should remain accepted: %+v", bid)
+		}
 	}
 
 	if wait := time.Until(endTime) + 300*time.Millisecond; wait > 0 {
 		time.Sleep(wait)
 	}
 
-	lateBid := integrationRequest(
-		t,
-		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/bids", server.URL, auctionID),
-		bidderBToken,
-		map[string]any{"bid_amount": 5750.0},
-	)
-	if lateBid.Status != http.StatusConflict {
-		t.Fatalf("late bid should be 409, got %d: %s", lateBid.Status, lateBid.Body)
-	}
+	lateBid := integrationRequest(t, http.MethodPost, bidURL, bidderBToken, map[string]any{"bid_amount": 6250.0})
+	requireHTTPStatus(t, "late bid", lateBid, http.StatusConflict)
 
 	closeResp := integrationRequest(
 		t,
 		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/close", server.URL, auctionID),
+		closeURL,
 		sellerToken,
 		nil,
 	)
-	if closeResp.Status != http.StatusOK {
-		t.Fatalf("close auction: expected 200, got %d: %s", closeResp.Status, closeResp.Body)
-	}
+	requireHTTPStatus(t, "close auction", closeResp, http.StatusOK)
 
 	var closed struct {
 		Auction AuctionResponse `json:"auction"`
@@ -376,13 +344,11 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	closeAgain := integrationRequest(
 		t,
 		http.MethodPost,
-		fmt.Sprintf("%s/api/auctions/%d/close", server.URL, auctionID),
+		closeURL,
 		sellerToken,
 		nil,
 	)
-	if closeAgain.Status != http.StatusConflict {
-		t.Fatalf("closing ended auction should be 409, got %d: %s", closeAgain.Status, closeAgain.Body)
-	}
+	requireHTTPStatus(t, "close ended auction", closeAgain, http.StatusConflict)
 
 	publicResp := integrationRequest(
 		t,
@@ -391,9 +357,7 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 		"",
 		nil,
 	)
-	if publicResp.Status != http.StatusOK {
-		t.Fatalf("public auction list: expected 200, got %d: %s", publicResp.Status, publicResp.Body)
-	}
+	requireHTTPStatus(t, "public auction list", publicResp, http.StatusOK)
 
 	var publicAuctions []AuctionListItem
 	if err := json.Unmarshal(publicResp.Body, &publicAuctions); err != nil {
@@ -405,13 +369,6 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 		}
 	}
 
-	t.Logf(
-		"PASS auction=%d bidderA=%d bidderB=%d final_price=5500 winner=%d listing=SOLD",
-		auctionID,
-		bidderAID,
-		bidderBID,
-		bidderAID,
-	)
 }
 
 func integrationToken(t *testing.T, userID int64) string {
@@ -447,19 +404,26 @@ func integrationRequest(
 	body any,
 ) httpTestResponse {
 	t.Helper()
+	resp, err := integrationRequestRaw(method, url, token, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
 
+func integrationRequestRaw(method, url, token string, body any) (httpTestResponse, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
-			t.Fatal(err)
+			return httpTestResponse{}, err
 		}
 		reader = bytes.NewReader(raw)
 	}
 
 	req, err := http.NewRequest(method, url, reader)
 	if err != nil {
-		t.Fatal(err)
+		return httpTestResponse{}, err
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -470,17 +434,14 @@ func integrationRequest(
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatal(err)
+		return httpTestResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatal(err)
+		return httpTestResponse{}, err
 	}
 
-	return httpTestResponse{
-		Status: resp.StatusCode,
-		Body:   raw,
-	}
+	return httpTestResponse{Status: resp.StatusCode, Body: raw}, nil
 }
