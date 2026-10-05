@@ -2,7 +2,6 @@ package gembid
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"math"
@@ -71,6 +70,11 @@ func roundMoney(v float64) float64 {
 	return math.Round(v*100) / 100
 }
 
+const auctionColumns = `auction_id, listing_id, starting_price, minimum_increment,
+	reserve_price, current_price, current_highest_bidder_id,
+	start_time, end_time, status, winner_id, winning_bid_id,
+	created_at, closed_at`
+
 func scanAuction(row pgx.Row, auction *AuctionResponse) error {
 	return row.Scan(
 		&auction.AuctionID,
@@ -91,15 +95,10 @@ func scanAuction(row pgx.Row, auction *AuctionResponse) error {
 }
 
 func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request CreateAuctionRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -221,12 +220,7 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 				status
 			)
 			VALUES ($1, $2, $3, $4, $2, $5, $6, $7)
-			RETURNING
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			`,
+			RETURNING `+auctionColumns,
 			request.ListingID,
 			request.StartingPrice,
 			request.MinimumIncrement,
@@ -269,32 +263,14 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Auction created",
 		"auction": auction,
 	})
 }
 
 func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
-	_, _ = DB.Exec(
-		r.Context(),
-		`
-		WITH activated AS (
-			UPDATE public.auctions
-			SET status = 'ACTIVE'
-			WHERE status = 'SCHEDULED'
-			  AND start_time <= NOW()
-			  AND end_time > NOW()
-			RETURNING listing_id
-		)
-		UPDATE public.listings l
-		SET status = 'ACTIVE', updated_at = NOW()
-		FROM activated a
-		WHERE l.listing_id = a.listing_id
-		`,
-	)
+	activateDueAuctions(r.Context(), 0)
 
 	rows, err := DB.Query(
 		r.Context(),
@@ -325,12 +301,9 @@ func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not fetch auctions", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	auctions := []AuctionListItem{}
-	for rows.Next() {
+	auctions, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (AuctionListItem, error) {
 		var item AuctionListItem
-		if err := rows.Scan(
+		err := row.Scan(
 			&item.AuctionID,
 			&item.ListingID,
 			&item.GemID,
@@ -343,57 +316,31 @@ func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
 			&item.StartTime,
 			&item.EndTime,
 			&item.Status,
-		); err != nil {
-			http.Error(w, "Could not read auction data", http.StatusInternalServerError)
-			return
-		}
-		auctions = append(auctions, item)
+		)
+		return item, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read auction data", http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(auctions)
+	writeJSON(w, http.StatusOK, auctions)
 }
 
 func GetAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
 
-	_, _ = DB.Exec(
-		r.Context(),
-		`
-		WITH activated AS (
-			UPDATE public.auctions
-			SET status = 'ACTIVE'
-			WHERE auction_id = $1
-			  AND status = 'SCHEDULED'
-			  AND start_time <= NOW()
-			  AND end_time > NOW()
-			RETURNING listing_id
-		)
-		UPDATE public.listings l
-		SET status = 'ACTIVE', updated_at = NOW()
-		FROM activated a
-		WHERE l.listing_id = a.listing_id
-		`,
-		auctionID,
-	)
+	activateDueAuctions(r.Context(), auctionID)
 
 	var auction AuctionResponse
-	err = scanAuction(
+	err := scanAuction(
 		DB.QueryRow(
 			r.Context(),
-			`
-			SELECT
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			FROM public.auctions
-			WHERE auction_id = $1
-			`,
+			`SELECT `+auctionColumns+` FROM public.auctions WHERE auction_id = $1`,
 			auctionID,
 		),
 		&auction,
@@ -407,13 +354,12 @@ func GetAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(auction)
+	writeJSON(w, http.StatusOK, auction)
 }
 
 func ListAuctionBidsHandler(w http.ResponseWriter, r *http.Request) {
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
@@ -446,45 +392,37 @@ func ListAuctionBidsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not fetch bids", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	bids := []BidResponse{}
-	for rows.Next() {
+	bids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (BidResponse, error) {
 		var bid BidResponse
-		if err := rows.Scan(
+		err := row.Scan(
 			&bid.BidID,
 			&bid.AuctionID,
 			&bid.BidderID,
 			&bid.BidAmount,
 			&bid.BidTime,
 			&bid.BidStatus,
-		); err != nil {
-			http.Error(w, "Could not read bid data", http.StatusInternalServerError)
-			return
-		}
-		bids = append(bids, bid)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(bids)
-}
-
-func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(int64)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		)
+		return bid, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read bid data", http.StatusInternalServerError)
 		return
 	}
 
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	writeJSON(w, http.StatusOK, bids)
+}
+
+func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(userIDKey).(int64)
+
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
 
 	var request PlaceBidRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -665,9 +603,7 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 
 	nextMinimum := roundMoney(request.BidAmount + minimumIncrement)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message":          "Bid accepted",
 		"bid":              bid,
 		"current_price":    request.BidAmount,
@@ -676,11 +612,7 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	auctionID, ok := pathID(r)
 	if !ok {
@@ -738,15 +670,7 @@ func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
 	err = scanAuction(
 		DB.QueryRow(
 			r.Context(),
-			`
-			SELECT
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			FROM public.auctions
-			WHERE auction_id = $1
-			`,
+			`SELECT `+auctionColumns+` FROM public.auctions WHERE auction_id = $1`,
 			auctionID,
 		),
 		&auction,
@@ -765,8 +689,7 @@ func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		response["order_id"] = result.OrderID
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 var (

@@ -1,7 +1,6 @@
 package gembid
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -42,17 +41,11 @@ type GemResponse struct {
 
 func CreateGemHandler(w http.ResponseWriter, r *http.Request) {
 
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request CreateGemRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -96,24 +89,7 @@ func CreateGemHandler(w http.ResponseWriter, r *http.Request) {
 			NULLIF($12, ''),
 			NULLIF($13, '')
 		)
-		RETURNING
-			gem_id,
-			seller_id,
-			gem_name,
-			gem_type,
-			carat,
-			length,
-			width,
-			height,
-			shape,
-			color,
-			clarity,
-			origin,
-			treatment,
-			description,
-			created_at,
-			updated_at
-		`,
+		RETURNING `+gemColumns,
 		sellerID,
 		request.GemName,
 		request.GemType,
@@ -134,14 +110,8 @@ func CreateGemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message": "Gem created successfully",
-			"gem":     gem,
-		},
-	)
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Gem created successfully",
+		"gem":     gem,
+	})
 }

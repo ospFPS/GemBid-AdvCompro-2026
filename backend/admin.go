@@ -1,9 +1,7 @@
 package gembid
 
 import (
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -104,15 +102,9 @@ func AdminSellerApplicationsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer rows.Close()
-
-	applications := make([]AdminSellerApplication, 0)
-
-	for rows.Next() {
-
+	applications, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (AdminSellerApplication, error) {
 		var application AdminSellerApplication
-
-		err := rows.Scan(
+		err := row.Scan(
 			&application.SellerID,
 			&application.UserID,
 			&application.Username,
@@ -128,50 +120,32 @@ func AdminSellerApplicationsHandler(w http.ResponseWriter, r *http.Request) {
 			&application.ReviewedAt,
 			&application.ReviewedBy,
 		)
-
-		if err != nil {
-			http.Error(w, "Could not read seller applications", http.StatusInternalServerError)
-			return
-		}
-
-		applications = append(applications, application)
-	}
-
-	if err := rows.Err(); err != nil {
-		http.Error(w, "Could not finish reading seller applications", http.StatusInternalServerError)
+		return application, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read seller applications", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"applications": applications,
-			"count":        len(applications),
-		},
-	)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"applications": applications,
+		"count":        len(applications),
+	})
 }
 
 func AdminReviewSellerHandler(w http.ResponseWriter, r *http.Request) {
 
-	adminUserID, ok := r.Context().Value(userIDKey).(int64)
+	adminUserID, _ := r.Context().Value(userIDKey).(int64)
 
+	sellerID, ok := pathID(r)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	sellerID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-
-	if err != nil || sellerID <= 0 {
 		http.Error(w, "Invalid seller application ID", http.StatusBadRequest)
 		return
 	}
 
 	var request SellerReviewRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -273,18 +247,14 @@ func AdminReviewSellerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message":             "Seller application reviewed successfully",
-			"seller_id":           sellerID,
-			"user_id":             sellerUserID,
-			"decision":            request.Decision,
-			"verification_status": newStatus,
-			"reviewed_by":         adminUserID,
-		},
-	)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":             "Seller application reviewed successfully",
+		"seller_id":           sellerID,
+		"user_id":             sellerUserID,
+		"decision":            request.Decision,
+		"verification_status": newStatus,
+		"reviewed_by":         adminUserID,
+	})
 }
 
 func AdminAnalyticsHandler(w http.ResponseWriter, r *http.Request) {

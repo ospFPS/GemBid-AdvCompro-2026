@@ -1,9 +1,7 @@
 package gembid
 
 import (
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -51,6 +49,9 @@ func cleanAndValidateGemRequest(request *CreateGemRequest) string {
 	return ""
 }
 
+const gemColumns = `gem_id, seller_id, gem_name, gem_type, carat, length, width, height,
+	shape, color, clarity, origin, treatment, description, created_at, updated_at`
+
 func scanGem(row pgx.Row, gem *GemResponse) error {
 	return row.Scan(
 		&gem.GemID, &gem.SellerID, &gem.GemName, &gem.GemType,
@@ -64,27 +65,7 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := DB.Query(
 		r.Context(),
-		`
-		SELECT
-			gem_id,
-			seller_id,
-			gem_name,
-			gem_type,
-			carat,
-			length,
-			width,
-			height,
-			shape,
-			color,
-			clarity,
-			origin,
-			treatment,
-			description,
-			created_at,
-			updated_at
-		FROM public.gems
-		ORDER BY created_at DESC
-		`,
+		`SELECT `+gemColumns+` FROM public.gems ORDER BY created_at DESC`,
 	)
 
 	if err != nil {
@@ -92,68 +73,32 @@ func ListGemsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer rows.Close()
-
-	gems := make([]GemResponse, 0)
-
-	for rows.Next() {
-
+	gems, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GemResponse, error) {
 		var gem GemResponse
-
-		err := scanGem(rows, &gem)
-
-		if err != nil {
-			http.Error(w, "Could not read gem data", http.StatusInternalServerError)
-			return
-		}
-
-		gems = append(gems, gem)
-	}
-
-	if err := rows.Err(); err != nil {
-		http.Error(w, "Could not finish reading gems", http.StatusInternalServerError)
+		err := scanGem(row, &gem)
+		return gem, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read gem data", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(gems)
+	writeJSON(w, http.StatusOK, gems)
 }
 
 func GetGemHandler(w http.ResponseWriter, r *http.Request) {
 
-	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-
-	if err != nil || gemID <= 0 {
+	gemID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
 
 	var gem GemResponse
 
-	err = scanGem(DB.QueryRow(
+	err := scanGem(DB.QueryRow(
 		r.Context(),
-		`
-		SELECT
-			gem_id,
-			seller_id,
-			gem_name,
-			gem_type,
-			carat,
-			length,
-			width,
-			height,
-			shape,
-			color,
-			clarity,
-			origin,
-			treatment,
-			description,
-			created_at,
-			updated_at
-		FROM public.gems
-		WHERE gem_id = $1
-		`,
+		`SELECT `+gemColumns+` FROM public.gems WHERE gem_id = $1`,
 		gemID,
 	), &gem)
 
@@ -167,31 +112,22 @@ func GetGemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(gem)
+	writeJSON(w, http.StatusOK, gem)
 }
 
 func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
+	gemID, ok := pathID(r)
 	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
-
-	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-
-	if err != nil || gemID <= 0 {
 		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
 
 	var request CreateGemRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -203,7 +139,7 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 	var ownerID int64
 	var locked bool
 
-	err = DB.QueryRow(
+	err := DB.QueryRow(
 		r.Context(),
 		`
 		SELECT
@@ -270,24 +206,7 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 			updated_at = NOW()
 		WHERE gem_id = $13
 		AND seller_id = $14
-		RETURNING
-			gem_id,
-			seller_id,
-			gem_name,
-			gem_type,
-			carat,
-			length,
-			width,
-			height,
-			shape,
-			color,
-			clarity,
-			origin,
-			treatment,
-			description,
-			created_at,
-			updated_at
-		`,
+		RETURNING `+gemColumns,
 		request.GemName,
 		request.GemType,
 		request.Carat,
@@ -309,35 +228,25 @@ func UpdateGemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message": "Gem updated successfully",
-			"gem":     gem,
-		},
-	)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Gem updated successfully",
+		"gem":     gem,
+	})
 }
 
 func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
+	gemID, ok := pathID(r)
 	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
-
-	gemID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-
-	if err != nil || gemID <= 0 {
 		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
 		return
 	}
 
 	var ownerID int64
 
-	err = DB.QueryRow(
+	err := DB.QueryRow(
 		r.Context(),
 		`
 		SELECT seller_id
@@ -385,11 +294,7 @@ func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(
-		map[string]string{
-			"message": "Gem deleted successfully",
-		},
-	)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Gem deleted successfully",
+	})
 }

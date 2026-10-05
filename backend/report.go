@@ -65,8 +65,7 @@ func CreateReportHandler(w http.ResponseWriter, r *http.Request) {
 	reporterID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request CreateReportRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -290,8 +289,7 @@ func AdminReviewReportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request ReviewReportRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.Decision = strings.ToUpper(strings.TrimSpace(request.Decision))

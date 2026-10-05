@@ -1,7 +1,6 @@
 package gembid
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +14,7 @@ func Run() {
 	defer DB.Close()
 
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if len([]byte(jwtSecret)) < 32 {
+	if len(jwtSecret) < 32 {
 		log.Fatal("JWT_SECRET must be at least 32 bytes")
 	}
 
@@ -30,8 +29,7 @@ func Run() {
 	))
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	mux.HandleFunc("POST /api/register", RegisterHandler)

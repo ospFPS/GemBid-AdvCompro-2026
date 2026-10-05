@@ -3,7 +3,6 @@ package gembid
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -17,19 +16,15 @@ type contextKey string
 
 const userIDKey contextKey = "user_id"
 
-func decodeJSON(r *http.Request, dst any) error {
+// decodeJSON reads exactly one strict JSON value; on failure it writes 400 and returns false.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dst); err != nil {
-		return err
+	if decoder.Decode(dst) != nil || decoder.Decode(&struct{}{}) != io.EOF {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return false
 	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		if err == nil {
-			return errors.New("request body must contain one JSON value")
-		}
-		return err
-	}
-	return nil
+	return true
 }
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -42,16 +37,11 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-
-		if len(parts) != 2 ||
-			!strings.EqualFold(parts[0], "Bearer") {
-
+		scheme, tokenString, found := strings.Cut(authHeader, " ")
+		if !found || !strings.EqualFold(scheme, "Bearer") {
 			http.Error(w, "Invalid authorization header", http.StatusUnauthorized)
 			return
 		}
-
-		tokenString := parts[1]
 
 		jwtSecret := os.Getenv("JWT_SECRET")
 
@@ -66,14 +56,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
-
-		if !ok {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		subject, err := claims.GetSubject()
+		subject, err := token.Claims.GetSubject()
 
 		if err != nil {
 			http.Error(w, "Invalid token subject", http.StatusUnauthorized)
@@ -92,47 +75,15 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func MeHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(int64)
+	userID, _ := r.Context().Value(userIDKey).(int64)
 
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	var user UserResponse
-
-	err := DB.QueryRow(
-		r.Context(),
-		`
-		SELECT
-			user_id,
-			username,
-			full_name,
-			email,
-			phone,
-			role,
-			seller_status,
-			created_at
-		FROM public.users
-		WHERE user_id = $1
-		`,
-		userID,
-	).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.FullName,
-		&user.Email,
-		&user.Phone,
-		&user.Role,
-		&user.SellerStatus,
-		&user.CreatedAt,
-	)
+	user, err := scanUser(DB.QueryRow(r.Context(),
+		`SELECT `+userColumns+` FROM public.users WHERE user_id = $1`, userID))
 
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	writeJSON(w, http.StatusOK, user)
 }

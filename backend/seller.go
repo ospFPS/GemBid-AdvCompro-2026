@@ -1,7 +1,6 @@
 package gembid
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -42,17 +41,11 @@ func scanSellerApplication(row pgx.Row, application *SellerApplicationResponse) 
 
 func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 
-	userID, ok := r.Context().Value(userIDKey).(int64)
-
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request SellerApplyRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -179,26 +172,15 @@ func SellerApplyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message":     "Seller application submitted successfully",
-			"application": application,
-		},
-	)
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message":     "Seller application submitted successfully",
+		"application": application,
+	})
 }
 
 func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
-	userID, ok := r.Context().Value(userIDKey).(int64)
-
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var sellerStatus string
 
@@ -218,14 +200,10 @@ func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sellerStatus == "NONE" {
-		w.Header().Set("Content-Type", "application/json")
-
-		json.NewEncoder(w).Encode(
-			map[string]interface{}{
-				"seller_status": "NONE",
-				"application":   nil,
-			},
-		)
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"seller_status": "NONE",
+			"application":   nil,
+		})
 
 		return
 	}
@@ -258,12 +236,8 @@ func SellerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"seller_status": sellerStatus,
-			"application":   application,
-		},
-	)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"seller_status": sellerStatus,
+		"application":   application,
+	})
 }

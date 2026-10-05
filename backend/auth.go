@@ -1,7 +1,6 @@
 package gembid
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/mail"
 	"os"
@@ -14,6 +13,18 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var usernameRE = regexp.MustCompile(`^[a-z0-9._-]{3,30}$`)
+
+const userColumns = `user_id, username, full_name, email, phone, role, seller_status, created_at`
+
+// scanUser scans userColumns, then any extra destinations selected after them.
+func scanUser(row pgx.Row, extra ...any) (UserResponse, error) {
+	var u UserResponse
+	err := row.Scan(append([]any{&u.UserID, &u.Username, &u.FullName, &u.Email, &u.Phone,
+		&u.Role, &u.SellerStatus, &u.CreatedAt}, extra...)...)
+	return u, err
+}
 
 type RegisterRequest struct {
 	Username string `json:"username"`
@@ -53,8 +64,7 @@ type ChangePasswordRequest struct {
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var request RegisterRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -67,7 +77,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "username and password are required", http.StatusBadRequest)
 		return
 	}
-	if !regexp.MustCompile(`^[a-z0-9._-]{3,30}$`).MatchString(request.Username) {
+	if !usernameRE.MatchString(request.Username) {
 		http.Error(w, "username must be 3-30 characters using a-z, 0-9, dot, underscore or hyphen", http.StatusBadRequest)
 		return
 	}
@@ -84,7 +94,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(request.Password) < 8 || len([]byte(request.Password)) > 72 {
+	if len(request.Password) < 8 || len(request.Password) > 72 {
 		http.Error(w, "Password must be 8 to 72 bytes", http.StatusBadRequest)
 		return
 	}
@@ -99,9 +109,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user UserResponse
-
-	err = DB.QueryRow(
+	user, err := scanUser(DB.QueryRow(
 		r.Context(),
 		`
 		INSERT INTO public.users (
@@ -112,31 +120,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			phone
 		)
 		VALUES ($1, $2, NULLIF($3, ''), $4, NULLIF($5, ''))
-		RETURNING
-			user_id,
-			username,
-			full_name,
-			email,
-			phone,
-			role,
-			seller_status,
-			created_at
-		`,
+		RETURNING `+userColumns,
 		request.Username,
 		request.FullName,
 		request.Email,
 		string(passwordHash),
 		request.Phone,
-	).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.FullName,
-		&user.Email,
-		&user.Phone,
-		&user.Role,
-		&user.SellerStatus,
-		&user.CreatedAt,
-	)
+	))
 
 	if err != nil {
 		if isPGError(err, "23505") {
@@ -147,10 +137,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "User registered successfully",
 		"user":    user,
 	})
@@ -159,46 +146,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var request LoginRequest
 
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
 	request.Username = strings.ToLower(strings.TrimSpace(request.Username))
 
-	var (
-		user         UserResponse
-		passwordHash string
-	)
-
-	err := DB.QueryRow(
+	var passwordHash string
+	user, err := scanUser(DB.QueryRow(
 		r.Context(),
-		`
-		SELECT
-			user_id,
-			username,
-			full_name,
-			email,
-			password_hash,
-			phone,
-			role,
-			seller_status,
-			created_at
-		FROM public.users
-		WHERE username = $1
-		`,
+		`SELECT `+userColumns+`, password_hash FROM public.users WHERE username = $1`,
 		request.Username,
-	).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.FullName,
-		&user.Email,
-		&passwordHash,
-		&user.Phone,
-		&user.Role,
-		&user.SellerStatus,
-		&user.CreatedAt,
-	)
+	), &passwordHash)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
@@ -222,11 +181,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 
-	if jwtSecret == "" {
-		http.Error(w, "JWT configuration missing", http.StatusInternalServerError)
-		return
-	}
-
 	now := time.Now()
 
 	token := jwt.NewWithClaims(
@@ -245,9 +199,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Login successful",
 		"token":   tokenString,
 		"user":    user,
@@ -255,15 +207,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(int64)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request UpdateProfileRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -274,7 +221,7 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "full_name is required", http.StatusBadRequest)
 		return
 	}
-	if request.Username != "" && !regexp.MustCompile(`^[a-z0-9._-]{3,30}$`).MatchString(request.Username) {
+	if request.Username != "" && !usernameRE.MatchString(request.Username) {
 		http.Error(w, "username must be 3-30 characters using a-z, 0-9, dot, underscore or hyphen", http.StatusBadRequest)
 		return
 	}
@@ -283,8 +230,7 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user UserResponse
-	err := DB.QueryRow(
+	user, err := scanUser(DB.QueryRow(
 		r.Context(),
 		`
 		UPDATE public.users
@@ -293,10 +239,9 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 			phone = NULLIF($3, ''),
 			updated_at = NOW()
 		WHERE user_id = $4
-		RETURNING user_id, username, full_name, email, phone, role, seller_status, created_at
-		`,
+		RETURNING `+userColumns,
 		request.FullName, request.Username, request.Phone, userID,
-	).Scan(&user.UserID, &user.Username, &user.FullName, &user.Email, &user.Phone, &user.Role, &user.SellerStatus, &user.CreatedAt)
+	))
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "User not found", http.StatusNotFound)
@@ -311,23 +256,17 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"message": "Profile updated", "user": user})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Profile updated", "user": user})
 }
 
 func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(int64)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request ChangePasswordRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
-	if request.CurrentPassword == "" || len(request.NewPassword) < 8 || len([]byte(request.NewPassword)) > 72 {
+	if request.CurrentPassword == "" || len(request.NewPassword) < 8 || len(request.NewPassword) > 72 {
 		http.Error(w, "current_password is required and new_password must be 8 to 72 bytes", http.StatusBadRequest)
 		return
 	}
@@ -362,6 +301,5 @@ func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Password changed successfully"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Password changed successfully"})
 }

@@ -111,8 +111,7 @@ func UpgradeSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var request UpgradeSubscriptionRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.PaymentMethod = strings.ToUpper(strings.TrimSpace(request.PaymentMethod))

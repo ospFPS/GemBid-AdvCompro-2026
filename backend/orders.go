@@ -369,8 +369,7 @@ func PayOrderHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request PayOrderRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.PaymentMethod = strings.ToUpper(strings.TrimSpace(request.PaymentMethod))
@@ -467,8 +466,7 @@ func ShipOrderHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request ShipOrderRequest
-	if err := decodeJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.Courier = strings.TrimSpace(request.Courier)
