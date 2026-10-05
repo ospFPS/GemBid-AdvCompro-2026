@@ -1,4 +1,3 @@
-// Prototype item
 const mockItems = [
 	{
 		id: "leek-1",
@@ -6,6 +5,8 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 12.99,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-1",
@@ -13,6 +14,8 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 24.5,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-1",
@@ -20,6 +23,8 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 125.3,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "leek-2",
@@ -27,6 +32,8 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 18,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-2",
@@ -34,6 +41,8 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 31.75,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-2",
@@ -41,6 +50,8 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 132.2,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "leek-3",
@@ -48,6 +59,8 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 15.25,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-3",
@@ -55,6 +68,8 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 42,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-3",
@@ -62,6 +77,8 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 532.1,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 		{
 		id: "leek-4",
@@ -69,6 +86,8 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 16.35,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-4",
@@ -76,6 +95,8 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 69.69,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-4",
@@ -83,6 +104,8 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 1253.25,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 ];
 

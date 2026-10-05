@@ -164,6 +164,11 @@ export default async function StorePage({ searchParams }) {
                       <img src={item.image} alt={item.title} />
                       <h2>{item.title}</h2>
                       <p>{item.description}</p>
+                      {/* seller detail */}
+                      <div className="listing-seller">
+                        <img src={item.pfp} alt="" />
+                        <span>Sold by {item.seller}</span>
+                      </div>
                       <p className="store-item-price">
                         {new Intl.NumberFormat("en-US", {
                           style: "currency",

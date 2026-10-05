@@ -25,6 +25,14 @@ export default async function ItemPage({ searchParams }) {
 					<div>
 						<h1>{item.title}</h1>
 						<p>{item.description}</p>
+						{/* seller detail */}
+						<div className="item-detail-seller">
+							<img src={item.pfp} alt="" />
+							<div>
+								<span className="seller-label">Seller</span>
+								<strong>{item.seller}</strong>
+							</div>
+						</div>
 						<p className="item-detail-price">
 							{new Intl.NumberFormat("en-US", {
 								style: "currency",
