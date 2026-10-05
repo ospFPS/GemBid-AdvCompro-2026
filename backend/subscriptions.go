@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,8 +24,8 @@ const (
 type SubscriptionPlan struct {
 	Plan             string   `json:"plan"`
 	PriceTHB         float64  `json:"price_thb"`
-	PeriodDays       *int     `json:"period_days"`
-	LiveListingLimit *int     `json:"live_listing_limit"`
+	PeriodDays       int      `json:"period_days,omitempty"`
+	LiveListingLimit int      `json:"live_listing_limit,omitempty"`
 	Features         []string `json:"features"`
 }
 
@@ -43,14 +42,17 @@ type UpgradeSubscriptionRequest struct {
 	PaymentMethod string `json:"payment_method" example:"MOCK_CARD"`
 }
 
-func plans() []SubscriptionPlan {
-	limit, days := freeLiveListingLimit, proPeriodDays
-	return []SubscriptionPlan{
-		{Plan: "FREE", PriceTHB: 0, LiveListingLimit: &limit,
-			Features: []string{"Browse, bid and buy", "Up to " + strconv.Itoa(limit) + " live listings as a seller"}},
-		{Plan: "PRO", PriceTHB: proPriceTHB, PeriodDays: &days,
-			Features: []string{"Everything in FREE", "Unlimited live listings"}},
-	}
+var plans = []SubscriptionPlan{
+	{Plan: "FREE", PriceTHB: 0, LiveListingLimit: freeLiveListingLimit,
+		Features: []string{"Browse, bid and buy", "Up to " + strconv.Itoa(freeLiveListingLimit) + " live listings as a seller"}},
+	{Plan: "PRO", PriceTHB: proPriceTHB, PeriodDays: proPeriodDays,
+		Features: []string{"Everything in FREE", "Unlimited live listings"}},
+}
+
+func scanSubscription(row pgx.Row) (SubscriptionResponse, error) {
+	var s SubscriptionResponse
+	err := row.Scan(&s.SubscriptionID, &s.Plan, &s.Status, &s.StartDate, &s.EndDate, &s.CreatedAt)
+	return s, err
 }
 
 // checkListingQuota returns a non-empty message when a FREE seller is at the live listing limit.
@@ -88,7 +90,7 @@ func checkListingQuota(ctx context.Context, q interface {
 // @Success 200 {array} SubscriptionPlan
 // @Router /api/subscriptions/plans [get]
 func ListPlansHandler(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, plans())
+	writeJSON(w, http.StatusOK, plans)
 }
 
 // MySubscriptionHandler godoc
@@ -102,15 +104,14 @@ func ListPlansHandler(w http.ResponseWriter, r *http.Request) {
 func MySubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
-	var s SubscriptionResponse
-	err := DB.QueryRow(
+	s, err := scanSubscription(DB.QueryRow(
 		r.Context(),
 		`
 		SELECT subscription_id, plan, status, start_date, end_date, created_at
 		FROM public.subscriptions
 		WHERE user_id = $1 AND `+activeProSubscriptionSQL,
 		userID,
-	).Scan(&s.SubscriptionID, &s.Plan, &s.Status, &s.StartDate, &s.EndDate, &s.CreatedAt)
+	))
 
 	if err == pgx.ErrNoRows {
 		writeJSON(w, http.StatusOK, map[string]any{"plan": "FREE", "subscription": nil})
@@ -140,10 +141,7 @@ func UpgradeSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var request UpgradeSubscriptionRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.PaymentMethod = strings.ToUpper(strings.TrimSpace(request.PaymentMethod))
@@ -173,19 +171,14 @@ func UpgradeSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scan := func(row pgx.Row) (SubscriptionResponse, error) {
-		var s SubscriptionResponse
-		err := row.Scan(&s.SubscriptionID, &s.Plan, &s.Status, &s.StartDate, &s.EndDate, &s.CreatedAt)
-		return s, err
-	}
 	const returning = ` RETURNING subscription_id, plan, status, start_date, end_date, created_at`
 
-	sub, err := scan(tx.QueryRow(ctx,
+	sub, err := scanSubscription(tx.QueryRow(ctx,
 		`UPDATE public.subscriptions SET end_date = end_date + $2::int
 		 WHERE user_id = $1 AND status = 'ACTIVE' AND plan = 'PRO'`+returning,
 		userID, proPeriodDays))
 	if err == pgx.ErrNoRows {
-		sub, err = scan(tx.QueryRow(ctx,
+		sub, err = scanSubscription(tx.QueryRow(ctx,
 			`INSERT INTO public.subscriptions (user_id, plan, status, start_date, end_date)
 			 VALUES ($1, 'PRO', 'ACTIVE', CURRENT_DATE, CURRENT_DATE + $2::int)`+returning,
 			userID, proPeriodDays))

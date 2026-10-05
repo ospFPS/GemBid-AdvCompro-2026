@@ -557,9 +557,7 @@ func AdminAnalyticsHandler(w http.ResponseWriter, r *http.Request) {
 			),
 			'subscriptions', json_build_object(
 				'active_pro', (
-					SELECT count(*) FROM public.subscriptions
-					WHERE plan = 'PRO' AND status = 'ACTIVE'
-					  AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+					SELECT count(*) FROM public.subscriptions WHERE `+activeProSubscriptionSQL+`
 				),
 				'revenue', (
 					SELECT COALESCE(sum(amount), 0) FROM public.transactions

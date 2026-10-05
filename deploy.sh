@@ -16,14 +16,9 @@ done
 
 docker compose up -d --build
 
-for _ in $(seq 1 30); do
-    if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
-        echo "Backend healthy on :8080 ($(git branch --show-current) @ $(git rev-parse --short HEAD))"
-        break
-    fi
-    sleep 1
-done
-curl -fsS http://localhost:8080/health >/dev/null || { docker compose logs --tail 50 backend; exit 1; }
+timeout 30 sh -c 'until curl -fsS http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done' \
+    || { docker compose logs --tail 50 backend; exit 1; }
+echo "Backend healthy on :8080 ($(git branch --show-current) @ $(git rev-parse --short HEAD))"
 
 if pgrep -x ngrok >/dev/null; then
     echo "ngrok already running"

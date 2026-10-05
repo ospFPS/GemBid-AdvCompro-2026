@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -97,21 +96,18 @@ func createOrder(
 	tx pgx.Tx,
 	listingID, buyerID, sellerID, auctionID, winningBidID int64,
 	price float64,
-) (int64, error) {
-	var orderID int64
-	err := tx.QueryRow(
+) (OrderResponse, error) {
+	return scanOrder(tx.QueryRow(
 		ctx,
 		`
-		INSERT INTO public.orders (
+		INSERT INTO public.orders AS o (
 			listing_id, buyer_id, seller_id, auction_id, winning_bid_id,
 			item_price, shipping_fee, total_amount, status
 		)
 		VALUES ($1, $2, $3, NULLIF($4::bigint, 0), NULLIF($5::bigint, 0), $6, 0, $6, 'PENDING_PAYMENT')
-		RETURNING order_id
-		`,
+		RETURNING `+orderColumns,
 		listingID, buyerID, sellerID, auctionID, winningBidID, price,
-	).Scan(&orderID)
-	return orderID, err
+	))
 }
 
 // ============================================================
@@ -185,7 +181,7 @@ func BuyNowHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderID, err := createOrder(ctx, tx, listingID, userID, sellerID, 0, 0, *price)
+	order, err := createOrder(ctx, tx, listingID, userID, sellerID, 0, 0, *price)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -198,15 +194,8 @@ func BuyNowHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := notify(ctx, tx, sellerUserID, "ORDER_CREATED", "New order received",
 		"A buyer placed a Buy Now order on your listing. Waiting for payment.",
-		0, listingID, orderID); err != nil {
+		0, listingID, order.OrderID); err != nil {
 		http.Error(w, "Could not create notification", http.StatusInternalServerError)
-		return
-	}
-
-	order, err := scanOrder(tx.QueryRow(ctx,
-		`SELECT `+orderColumns+` FROM public.orders o WHERE o.order_id = $1`, orderID))
-	if err != nil {
-		http.Error(w, "Could not load order", http.StatusInternalServerError)
 		return
 	}
 
@@ -452,10 +441,7 @@ func PayOrderHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
 	var request PayOrderRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.PaymentMethod = strings.ToUpper(strings.TrimSpace(request.PaymentMethod))
@@ -575,10 +561,7 @@ func ShipOrderHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request ShipOrderRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 	request.Courier = strings.TrimSpace(request.Courier)

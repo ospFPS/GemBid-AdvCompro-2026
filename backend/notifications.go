@@ -26,6 +26,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// decodeJSON reads a strict JSON body; on failure it writes 400 and returns false.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(v); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
 func pathID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	return id, err == nil && id > 0

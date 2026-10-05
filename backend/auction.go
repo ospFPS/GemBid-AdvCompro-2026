@@ -725,8 +725,8 @@ func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
@@ -945,11 +945,12 @@ func finalizeAuction(ctx context.Context, tx pgx.Tx, auctionID int64) (auctionRe
 		return result, err
 	}
 
-	result.OrderID, err = createOrder(ctx, tx, listingID, *highestBidderID, sellerID,
+	order, err := createOrder(ctx, tx, listingID, *highestBidderID, sellerID,
 		auctionID, *winningBidID, currentPrice)
 	if err != nil {
 		return result, err
 	}
+	result.OrderID = order.OrderID
 
 	if err := notify(ctx, tx, *highestBidderID, "AUCTION_WON", "You won the auction!",
 		"Your bid of "+formatTHB(currentPrice)+" won. Please pay for your order to receive the gem.",
