@@ -20,6 +20,14 @@ export default function Profile() {
                             id="username"
                             defaultValue="username"
                         />
+                        <label htmlFor="name">
+                            Full Name
+                        </label>
+                        <input
+                            type="text"
+                            id="name"
+                            defaultValue="Guest User"
+                        />
                         <label htmlFor="email">
                             Email
                         </label>
@@ -27,6 +35,22 @@ export default function Profile() {
                             type="email"
                             id="email"
                            defaultValue="user@example.com"
+                        />
+                        <label htmlFor="password">
+                            Password
+                        </label>
+                        <input
+                            type="password"
+                            id="password"
+                            placeholder="Enter new password"
+                        />
+                        <label htmlFor="phone">
+                            Phone Number
+                        </label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            defaultValue="123-456-7890"
                         />
                         <div className="profile-edit-actions">
                             <button type="button">
@@ -46,7 +70,13 @@ export default function Profile() {
                             <strong>Username:</strong> username
                         </p>
                         <p>
+                            <strong>Full Name:</strong> Guest User
+                        </p>
+                        <p>
                             <strong>Email:</strong> user@example.com
+                        </p>
+                        <p>
+                            <strong>Phone Number:</strong> 123-456-7890
                         </p>
                     </div>
                 )}
@@ -71,7 +101,6 @@ export default function Profile() {
                     <button onClick={() => setEditing(true)}>
                         Edit Profile
                     </button>
-                    <button>Change Password</button>
                     <button>Log Out</button>
                 </div>
             </section>
