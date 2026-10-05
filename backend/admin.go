@@ -495,3 +495,112 @@ func AdminReviewSellerHandler(
 		},
 	)
 }
+
+// ============================================================
+// GET /api/admin/analytics
+// ============================================================
+
+// AdminAnalyticsHandler godoc
+// @Summary Platform analytics
+// @Description Admin dashboard numbers: users, sellers, listings, auctions, bids, orders, sales (GMV), subscription revenue, email delivery and 30-day daily sales.
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /api/admin/analytics [get]
+func AdminAnalyticsHandler(w http.ResponseWriter, r *http.Request) {
+	var report []byte
+
+	// One round trip; PostgreSQL builds the JSON.
+	err := DB.QueryRow(
+		r.Context(),
+		`
+		SELECT json_build_object(
+			'generated_at', NOW(),
+			'users', (
+				SELECT json_build_object(
+					'total', count(*),
+					'admins', count(*) FILTER (WHERE role = 'ADMIN'),
+					'new_last_30_days', count(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days'),
+					'sellers_by_status', (
+						SELECT COALESCE(json_object_agg(seller_status, n), '{}')
+						FROM (SELECT seller_status, count(*) n FROM public.users GROUP BY seller_status) s
+					)
+				)
+				FROM public.users
+			),
+			'gems_total', (SELECT count(*) FROM public.gems),
+			'listings_by_status', (
+				SELECT COALESCE(json_object_agg(status, n), '{}')
+				FROM (SELECT status, count(*) n FROM public.listings GROUP BY status) s
+			),
+			'auctions_by_status', (
+				SELECT COALESCE(json_object_agg(status, n), '{}')
+				FROM (SELECT status, count(*) n FROM public.auctions GROUP BY status) s
+			),
+			'bids_total', (SELECT count(*) FROM public.bids),
+			'orders_by_status', (
+				SELECT COALESCE(json_object_agg(status, n), '{}')
+				FROM (SELECT status, count(*) n FROM public.orders GROUP BY status) s
+			),
+			'sales', (
+				SELECT json_build_object(
+					'paid_orders', count(*),
+					'gross_merchandise_value', COALESCE(sum(amount), 0),
+					'average_order_value', COALESCE(round(avg(amount), 2), 0)
+				)
+				FROM public.transactions
+				WHERE order_id IS NOT NULL AND status = 'SUCCESS'
+			),
+			'subscriptions', json_build_object(
+				'active_pro', (
+					SELECT count(*) FROM public.subscriptions
+					WHERE plan = 'PRO' AND status = 'ACTIVE'
+					  AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+				),
+				'revenue', (
+					SELECT COALESCE(sum(amount), 0) FROM public.transactions
+					WHERE subscription_id IS NOT NULL AND status = 'SUCCESS'
+				)
+			),
+			'emails_by_status', (
+				SELECT COALESCE(json_object_agg(status, n), '{}')
+				FROM (SELECT status, count(*) n FROM public.email_deliveries GROUP BY status) s
+			),
+			'top_gem_types_sold', (
+				SELECT COALESCE(json_agg(t), '[]')
+				FROM (
+					SELECT g.gem_type, count(*) AS orders, sum(o.total_amount) AS revenue
+					FROM public.orders o
+					INNER JOIN public.listings l ON l.listing_id = o.listing_id
+					INNER JOIN public.gems g ON g.gem_id = l.gem_id
+					WHERE o.status IN ('PAID', 'SHIPPED', 'DELIVERED')
+					GROUP BY g.gem_type
+					ORDER BY revenue DESC
+					LIMIT 5
+				) t
+			),
+			'daily_sales_last_30_days', (
+				SELECT COALESCE(json_agg(d ORDER BY d.day), '[]')
+				FROM (
+					SELECT paid_at::date AS day, count(*) AS orders, sum(amount) AS revenue
+					FROM public.transactions
+					WHERE order_id IS NOT NULL AND status = 'SUCCESS'
+					  AND paid_at >= NOW() - INTERVAL '30 days'
+					GROUP BY paid_at::date
+				) d
+			)
+		)
+		`,
+	).Scan(&report)
+	if err != nil {
+		http.Error(w, "Could not load analytics", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(report)
+}

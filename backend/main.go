@@ -233,6 +233,44 @@ func main() {
 		),
 	)
 
+	// ============================================================
+	// ORDERS, PAYMENT, SHIPPING
+	// ============================================================
+
+	mux.HandleFunc("POST /api/listings/{id}/buy", AuthMiddleware(BuyNowHandler))
+	mux.HandleFunc("GET /api/orders", AuthMiddleware(ListOrdersHandler))
+	mux.HandleFunc("GET /api/orders/{id}", AuthMiddleware(GetOrderHandler))
+	mux.HandleFunc("POST /api/orders/{id}/pay", AuthMiddleware(PayOrderHandler))
+	mux.HandleFunc("POST /api/orders/{id}/cancel", AuthMiddleware(CancelOrderHandler))
+	mux.HandleFunc("PUT /api/orders/{id}/ship", AuthMiddleware(VerifiedSellerMiddleware(ShipOrderHandler)))
+	mux.HandleFunc("POST /api/orders/{id}/confirm-delivery", AuthMiddleware(ConfirmDeliveryHandler))
+
+	// ============================================================
+	// NOTIFICATIONS
+	// ============================================================
+
+	mux.HandleFunc("GET /api/notifications", AuthMiddleware(ListNotificationsHandler))
+	mux.HandleFunc("PUT /api/notifications/read-all", AuthMiddleware(MarkAllNotificationsReadHandler))
+	mux.HandleFunc("PUT /api/notifications/{id}/read", AuthMiddleware(MarkNotificationReadHandler))
+
+	// ============================================================
+	// SUBSCRIPTIONS
+	// ============================================================
+
+	mux.HandleFunc("GET /api/subscriptions/plans", ListPlansHandler)
+	mux.HandleFunc("GET /api/subscriptions/me", AuthMiddleware(MySubscriptionHandler))
+	mux.HandleFunc("POST /api/subscriptions/upgrade", AuthMiddleware(UpgradeSubscriptionHandler))
+
+	// ============================================================
+	// ADMIN ANALYTICS
+	// ============================================================
+
+	mux.HandleFunc("GET /api/admin/analytics", AuthMiddleware(AdminMiddleware(AdminAnalyticsHandler)))
+
+	// Background jobs.
+	StartAuctionCloser()
+	StartEmailWorker()
+
 	port := os.Getenv("PORT")
 
 	if port == "" {

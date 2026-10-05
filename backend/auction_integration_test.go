@@ -126,6 +126,8 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 		cleanupCtx := context.Background()
 
 		if auctionID != 0 {
+			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.notifications WHERE auction_id = $1 OR listing_id = $2`, auctionID, listingID)
+			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.orders WHERE auction_id = $1`, auctionID)
 			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.bids WHERE auction_id = $1`, auctionID)
 			_, _ = DB.Exec(cleanupCtx, `DELETE FROM public.auctions WHERE auction_id = $1`, auctionID)
 		}
@@ -336,6 +338,7 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 
 	var closed struct {
 		Auction AuctionResponse `json:"auction"`
+		OrderID int64           `json:"order_id"`
 	}
 	if err := json.Unmarshal(closeResp.Body, &closed); err != nil {
 		t.Fatal(err)
@@ -359,6 +362,32 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	}
 	if listingStatus != "SOLD" {
 		t.Fatalf("expected SOLD listing, got %s", listingStatus)
+	}
+
+	var orderBuyer int64
+	var orderStatus string
+	var orderTotal float64
+	if err := DB.QueryRow(
+		ctx,
+		`SELECT buyer_id, status, total_amount FROM public.orders WHERE order_id = $1 AND auction_id = $2`,
+		closed.OrderID, auctionID,
+	).Scan(&orderBuyer, &orderStatus, &orderTotal); err != nil {
+		t.Fatalf("expected winner order %d: %v", closed.OrderID, err)
+	}
+	if orderBuyer != bidderAID || orderStatus != "PENDING_PAYMENT" || orderTotal != 5500 {
+		t.Fatalf("unexpected winner order: buyer=%d status=%s total=%.2f", orderBuyer, orderStatus, orderTotal)
+	}
+
+	var outbidCount int
+	if err := DB.QueryRow(
+		ctx,
+		`SELECT count(*) FROM public.notifications WHERE auction_id = $1 AND type = 'OUTBID'`,
+		auctionID,
+	).Scan(&outbidCount); err != nil {
+		t.Fatal(err)
+	}
+	if outbidCount != 2 {
+		t.Fatalf("expected 2 OUTBID notifications, got %d", outbidCount)
 	}
 
 	var winningBidStatus string

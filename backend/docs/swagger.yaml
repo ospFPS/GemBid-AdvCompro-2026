@@ -202,6 +202,53 @@ definitions:
       password:
         type: string
     type: object
+  main.OrderDetailResponse:
+    properties:
+      order:
+        $ref: '#/definitions/main.OrderResponse'
+      shipping:
+        $ref: '#/definitions/main.ShippingResponse'
+      transactions:
+        items:
+          $ref: '#/definitions/main.TransactionResponse'
+        type: array
+    type: object
+  main.OrderResponse:
+    properties:
+      auction_id:
+        type: integer
+      buyer_id:
+        type: integer
+      created_at:
+        type: string
+      item_price:
+        type: number
+      listing_id:
+        type: integer
+      order_id:
+        type: integer
+      seller_id:
+        type: integer
+      shipping_fee:
+        type: number
+      status:
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      winning_bid_id:
+        type: integer
+    type: object
+  main.PayOrderRequest:
+    properties:
+      payment_method:
+        example: MOCK_CARD
+        type: string
+      shipping_address:
+        example: 123 Sukhumvit Rd, Bangkok 10110
+        type: string
+    type: object
   main.PlaceBidRequest:
     properties:
       bid_amount:
@@ -244,6 +291,76 @@ definitions:
       decision:
         type: string
     type: object
+  main.ShipOrderRequest:
+    properties:
+      courier:
+        example: Kerry Express
+        type: string
+      tracking_number:
+        example: KEX123456789TH
+        type: string
+    type: object
+  main.ShippingResponse:
+    properties:
+      courier:
+        type: string
+      delivered_at:
+        type: string
+      shipped_at:
+        type: string
+      shipping_address:
+        type: string
+      shipping_id:
+        type: integer
+      status:
+        type: string
+      tracking_number:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  main.SubscriptionPlan:
+    properties:
+      features:
+        items:
+          type: string
+        type: array
+      live_listing_limit:
+        type: integer
+      period_days:
+        type: integer
+      plan:
+        type: string
+      price_thb:
+        type: number
+    type: object
+  main.TransactionResponse:
+    properties:
+      amount:
+        type: number
+      created_at:
+        type: string
+      order_id:
+        type: integer
+      paid_at:
+        type: string
+      payment_method:
+        type: string
+      reference_number:
+        type: string
+      status:
+        type: string
+      subscription_id:
+        type: integer
+      transaction_id:
+        type: integer
+    type: object
+  main.UpgradeSubscriptionRequest:
+    properties:
+      payment_method:
+        example: MOCK_CARD
+        type: string
+    type: object
   main.UserResponse:
     properties:
       created_at:
@@ -267,6 +384,36 @@ info:
   title: GemBid API
   version: "1.0"
 paths:
+  /api/admin/analytics:
+    get:
+      description: 'Admin dashboard numbers: users, sellers, listings, auctions, bids,
+        orders, sales (GMV), subscription revenue, email delivery and 30-day daily
+        sales.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Platform analytics
+      tags:
+      - Admin
   /api/admin/seller-applications:
     get:
       description: Admin-only endpoint to view seller applications.
@@ -521,8 +668,9 @@ paths:
       - Auctions
   /api/auctions/{id}/close:
     post:
-      description: Seller closes an auction after end_time. Reserve price is checked
-        and the listing becomes SOLD or UNSOLD.
+      description: Seller closes an auction after end_time (the backend also does
+        this automatically every 30s). Reserve price is checked; a winner gets a PENDING_PAYMENT
+        order, otherwise the listing becomes UNSOLD.
       parameters:
       - description: Auction ID
         in: path
@@ -881,6 +1029,48 @@ paths:
       summary: Get listing details
       tags:
       - Listings
+  /api/listings/{id}/buy:
+    post:
+      description: Buy a PUBLISHED fixed-price listing. Creates a PENDING_PAYMENT
+        order and reserves the listing (SOLD).
+      parameters:
+      - description: Listing ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.OrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Buy Now
+      tags:
+      - Orders
   /api/listings/{id}/publish:
     put:
       consumes:
@@ -987,6 +1177,287 @@ paths:
       summary: Get current user
       tags:
       - Authentication
+  /api/notifications:
+    get:
+      description: Newest first, max 100. Use ?unread=true for unread only.
+      parameters:
+      - description: Only unread
+        in: query
+        name: unread
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List my notifications
+      tags:
+      - Notifications
+  /api/notifications/{id}/read:
+    put:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mark one notification as read
+      tags:
+      - Notifications
+  /api/notifications/read-all:
+    put:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark all my notifications as read
+      tags:
+      - Notifications
+  /api/orders:
+    get:
+      description: Orders I bought. Use ?as=seller for orders on my shop.
+      parameters:
+      - description: buyer (default) or seller
+        in: query
+        name: as
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.OrderResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List my orders
+      tags:
+      - Orders
+  /api/orders/{id}:
+    get:
+      description: Order with shipping and payment transactions. Visible to the buyer,
+        the seller and admins.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.OrderDetailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get order detail
+      tags:
+      - Orders
+  /api/orders/{id}/cancel:
+    post:
+      description: Buyer cancels a PENDING_PAYMENT order. A fixed-price listing goes
+        back to PUBLISHED; an auction listing becomes UNSOLD.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.OrderDetailResponse'
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Cancel an unpaid order
+      tags:
+      - Orders
+  /api/orders/{id}/confirm-delivery:
+    post:
+      description: Buyer confirms a SHIPPED order has arrived. Order and shipping
+        become DELIVERED.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.OrderDetailResponse'
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Confirm delivery
+      tags:
+      - Shipping
+  /api/orders/{id}/pay:
+    post:
+      consumes:
+      - application/json
+      description: Buyer pays a PENDING_PAYMENT order with MOCK_CARD or MOCK_QR and
+        gives the shipping address. Order becomes PAID and a shipping record is created.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Payment method and shipping address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.PayOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.OrderDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Pay for an order (mock payment)
+      tags:
+      - Payments
+  /api/orders/{id}/ship:
+    put:
+      consumes:
+      - application/json
+      description: Seller adds courier and tracking number to a PAID order.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Courier and tracking number
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.ShipOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.OrderDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mark an order as shipped
+      tags:
+      - Shipping
   /api/register:
     post:
       consumes:
@@ -1089,6 +1560,73 @@ paths:
       summary: Get seller application status
       tags:
       - Seller
+  /api/subscriptions/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get my current plan
+      tags:
+      - Subscriptions
+  /api/subscriptions/plans:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.SubscriptionPlan'
+            type: array
+      summary: List subscription plans
+      tags:
+      - Subscriptions
+  /api/subscriptions/upgrade:
+    post:
+      consumes:
+      - application/json
+      description: Pays for 30 days of PRO. If PRO is already active, the end date
+        is extended by 30 days.
+      parameters:
+      - description: MOCK_CARD or MOCK_QR
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.UpgradeSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Upgrade to PRO (mock payment)
+      tags:
+      - Subscriptions
 schemes:
 - http
 - https

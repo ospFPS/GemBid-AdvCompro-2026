@@ -302,6 +302,14 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if msg, err := checkListingQuota(r.Context(), DB, sellerID); err != nil {
+			http.Error(w, "Could not check listing quota", http.StatusInternalServerError)
+			return
+		} else if msg != "" {
+			http.Error(w, msg, http.StatusForbidden)
+			return
+		}
+
 		err = DB.QueryRow(
 			r.Context(),
 			`
