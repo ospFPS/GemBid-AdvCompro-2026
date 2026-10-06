@@ -210,7 +210,6 @@ h1 {
 }
 
 /* Main content */
-
 .home-content {
     padding: 40px;
     max-width: 1400px;
@@ -265,9 +264,11 @@ h1 {
 }
 
 /* Become seller */
-
 .seller-card {
     border: 2px solid #a446c9;
+}
+.seller-card:hover {
+    border: 2.5px solid #540075;
 }
 
 /* =========================
@@ -479,23 +480,29 @@ h1 {
 .notification-filters button:hover {
     background-color: #eeeeee;
 }
-.notifications-page > button {
-    padding: 0.6rem 1.2rem;
-    margin-bottom: 2rem;
-    font-size: 1.2rem;
+.mark-all-read-button {
+    padding: 0.4rem 1rem;
+    font-size: 1rem;
     cursor: pointer;
-    background-color: #ff7070;
+    background-color: #ffa9a9;
     border: 1px solid #000000;
 }
-
-.notifications-page > button:hover {
-    background-color: #ff8585;
+.mark-all-read-button:hover {
+    background-color: #f8cfcf;
+}
+.notifications-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
 }
 .notifications-list {
     width: min(100%, 900px);
     margin: 0 auto;
 }
-.notifications-list p {
+.notification-message {
+    padding: 4rem;
     font-size: 2rem;
 }
 .notification-card {
@@ -517,6 +524,16 @@ h1 {
 .notification-time {
     color: #666666;
     font-size: 1.2rem !important;
+}
+.notification-card a{
+    display: inline-block;
+    margin-bottom: 1.2rem;
+    color: #6060ff;
+    font-size: 1.1rem;
+    text-decoration: underline;
+}
+.notification-card a:hover {
+    text-decoration: none;
 }
 .notification-card button {
     padding: 0.4rem 0.8rem;
@@ -569,6 +586,13 @@ h1 {
 .bid-filters button:hover {
     background-color: #eeeeee;
 }
+.my-bids-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
 .bids-list {
     width: min(100%, 900px);
     margin: 0 auto;
@@ -616,4 +640,178 @@ h1 {
 }
 .bid-status-lost {
     color: red;
+}
+
+/* =========================
+   My Purchases Page
+   ========================= */
+
+.my-purchases-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.my-purchases-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.my-purchases-home-link:hover {
+    text-decoration: underline;
+}
+.my-purchases-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.purchase-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.purchase-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.purchase-filters button.active {
+    background-color: #cccccc;
+}
+.purchase-filters button:hover {
+    background-color: #eeeeee;
+}
+.my-purchases-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.purchases-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.purchase-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 3rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.purchase-card img {
+    width: 350px;
+    height: 300px;
+    object-fit: cover;
+}
+.purchases-list h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.purchases-list p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.purchases-list button {
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    font-size: 1.2rem;
+}
+.purchase-status {
+    font-weight: bold;
+}
+.purchase-status-order-created {
+    color: rgb(210, 92, 1);
+}
+.purchase-status-payment {
+    color: rgb(255, 175, 4);
+}
+.purchase-status-seller-preparing {
+    color: rgb(192, 192, 0);
+}
+.purchase-status-shipped {
+    color: rgb(141, 176, 84);
+}
+.purchase-status-delivered {
+    color: rgb(0, 183, 0);
+}
+.purchase-status-completed {
+    color: darkgreen;
+}
+/* =========================
+   View Order Page
+   ========================= */
+.view-order-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.view-order-home button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    margin-bottom: 1.2rem;
+}
+.view-order-home button:hover {
+    background-color: #eeeeee;
+}
+.view-order-back-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.view-order-back-link:hover {
+    text-decoration: underline;
+}
+.view-order-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.view-order-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.order-details,
+.order-progress {
+    width: min(100%, 900px);
+    margin: 0 auto 1rem;
+    padding: 3rem;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    line-height: 2rem;
+}
+.order-details h2,
+.order-progress h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+.order-details p,
+.order-progress p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.order-progress p.completed {
+    color: darkgreen;
+}
+.order-progress p.not-completed {
+    color: #666666;
+}
+.order-details img {
+    width: 450px;
+    height: 425px;
+    object-fit: cover;
 }

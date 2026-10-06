@@ -4,7 +4,7 @@ const bids = [
     {
         id: 1,
         gemstone: "Blue Sapphire",
-        image: "/assets/Blue sapphire.webp",
+        image: "/assets/my-bids/Blue sapphire.webp",
         yourBid: "$500",
         currentBid: "$520",
         status: "Won",
@@ -13,7 +13,7 @@ const bids = [
     {
         id: 2,
         gemstone: "Ruby Necklace",
-        image: "/assets/Ruby necklace.jpg",
+        image: "/assets/my-bids/Ruby necklace.jpg",
         yourBid: "$280",
         currentBid: "$280",
         status: "Winning",
@@ -22,7 +22,7 @@ const bids = [
     {
         id: 3,
         gemstone: "Emerald Earrings",
-        image: "/assets/Emerald earrings.webp",
+        image: "/assets/my-bids/Emerald earrings.webp",
         yourBid: "$350",
         currentBid: "$400",
         status: "Lost",
@@ -31,7 +31,7 @@ const bids = [
     {
         id: 4,
         gemstone: "Diamond Ring",
-        image: "/assets/Diamond ring.webp",
+        image: "/assets/my-bids/Diamond ring.webp",
         yourBid: "$1000",
         currentBid: "$1200",
         status: "Outbid",
@@ -40,7 +40,7 @@ const bids = [
     {
         id: 5,
         gemstone: "Sapphire Earrings",
-        image: "/assets/Sapphire earrings.webp",
+        image: "/assets/my-bids/Sapphire earrings.webp",
         yourBid: "$650",
         currentBid: "$650",
         status: "Winning",
@@ -63,34 +63,36 @@ export default function MyBids() {
     });
     return (
         <main className="my-bids-page">
-            <a href="/" className="my-bids-home-link">
-                ← Back to Home
-            </a>
-
-            <h1>My Bids</h1>
-            <div className="bid-filters">
-                <button
-                    type="button"
-                    className={filter === "active" ? "active" : ""}
-                    onClick={() => setFilter("active")}
-                >
-                    Active
-                </button>
-                <button
-                    type="button"
-                    className={filter === "won" ? "active" : ""}
-                    onClick={() => setFilter("won")}
-                >
-                    Won
-                </button>
-                <button
-                    type="button"
-                    className={filter === "lost" ? "active" : ""}
-                    onClick={() => setFilter("lost")}
-                >
-                    Lost
-                </button>
+            <div className="my-bids-sticky-nav">
+                <a href="/" className="my-bids-home-link">
+                    ← Back to Home
+                </a>
+                <div className="bid-filters">
+                    <button
+                        type="button"
+                        className={filter === "active" ? "active" : ""}
+                        onClick={() => setFilter("active")}
+                    >
+                        Active
+                    </button>
+                    <button
+                        type="button"
+                        className={filter === "won" ? "active" : ""}
+                        onClick={() => setFilter("won")}
+                    >
+                        Won
+                    </button>
+                    <button
+                        type="button"
+                        className={filter === "lost" ? "active" : ""}
+                        onClick={() => setFilter("lost")}
+                    >
+                        Lost
+                    </button>
+                </div>
             </div>
+            <h1>My Bids</h1>
+            
             <div className="bids-list">
                 {filteredBids.map((bid) => (
                     <section
