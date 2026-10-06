@@ -17,7 +17,13 @@ export default function AddToCartButton({ itemId }) {
 
 	return (
 		<>
-			<button type="button" onClick={handleAddToCart}>Add to cart</button>
+			<button
+				className="item-action-button"
+				type="button"
+				onClick={handleAddToCart}
+			>
+				Add to cart
+			</button>
 			{message && <span role="status">{message}</span>}
 		</>
 	);

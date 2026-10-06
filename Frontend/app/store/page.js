@@ -162,6 +162,9 @@ export default async function StorePage({ searchParams }) {
                   >
                     <article className="store-item">
                       <img src={item.image} alt={item.title} />
+                      <span className={`listing-type-badge ${item.isBid ? "listing-type-badge--bid" : "listing-type-badge--fixed"}`}>
+                        {item.isBid ? "Bidding" : "Buy it now"}
+                      </span>
                       <h2>{item.title}</h2>
                       <p className="store-item-description">{item.description}</p>
                       {/* seller detail */}

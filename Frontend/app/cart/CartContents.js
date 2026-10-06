@@ -120,6 +120,9 @@ export default function CartContents({ listings }) {
 						<span>Total</span>
 						<strong>{formatPrice(totalPrice)}</strong>
 					</p>
+					<button className="item-action-button" type="button" disabled>
+						Buying coming soon
+					</button>
 				</aside>
 			</div>
 			<Link className="nav-link cart-continue" href="/store">Continue shopping</Link>
