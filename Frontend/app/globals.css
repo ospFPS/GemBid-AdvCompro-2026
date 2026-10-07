@@ -751,40 +751,49 @@ h1 {
 }
 
 .home-header nav a {
-  color: black;
-  text-decoration: none;
+    color: black;
+    font-size: 1.2rem;
+    text-decoration: none;
 }
-
 .home-header nav a:hover {
   text-decoration: underline;
 }
+.home-header nav a.Become-seller {
+    color: #a446c9;
+}
 
 /* Main content */
-
 .home-content {
-  padding: 40px;
-  max-width: 1200px;
-  margin: auto;
+    padding: 40px;
+    max-width: 1400px;
+    margin: auto;
+}
+.home-content p {
+    font-size: 1.2rem;
+}
+.home-content h3 {
+    font-size: 1.5rem;
+    margin-top: 0;
 }
 
 .welcome-section {
-  background-color: rgb(255, 255, 255);
-  padding: 30px;
-  margin-bottom: 30px;
-  border: 2px solid #000000;
+    background-color: rgb(255, 255, 255);
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 1px solid #b5b5b5;
 }
 
 .welcome-section h2 {
-  font-size: 40px;
-  margin-top: 0;
+    font-size: 3rem;
+    margin-top: 0;
 }
 
 /* Navigation cards */
 
 .home-options {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
 }
 
 .home-card {
@@ -798,7 +807,8 @@ h1 {
 }
 
 .home-card:hover {
-  border-color: black;
+    border: 2px solid #b5b5b5;
+    border-color: black;
 }
 
 .home-card h3 {
@@ -810,7 +820,6 @@ h1 {
 }
 
 /* Become seller */
-
 .seller-card {
   border: 2px solid #888;
 }
@@ -1062,4 +1071,554 @@ h1 {
   .bid-listing-image {
     width: 100%;
   }
+}
+    border: 2px solid #a446c9;
+}
+.seller-card:hover {
+    border: 2.5px solid #540075;
+}
+
+/* =========================
+   Profile Page
+   ========================= */
+
+.profile-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.profile-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.profile-card {
+    width: min(100%, 900px);
+    margin: 0 auto 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+}
+.profile-card h2 {
+    margin-top: 0;
+    font-size: 1.75rem;
+}
+.profile-card p {
+    font-size: 1.2rem;
+}
+.profile-information p {
+    margin: 0.75rem 0;
+    font-size: 1.2rem;
+}
+.profile-status p {
+    margin: 0.75rem 0;
+    font-size: 1.2rem;
+}
+.profile-link {
+    color: #a446c9;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.profile-link:hover {
+    text-decoration: underline;
+}
+.profile-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.profile-actions button {
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.profile-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.profile-home-link:hover {
+    text-decoration: underline;
+}
+/* Profile Edit Form */
+
+.profile-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.profile-edit-form label {
+  font-size: 1.2rem;
+    margin-top: 0.5rem;
+}
+
+.profile-edit-form input {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    font-family: Arial, sans-serif;
+    border: 1px solid #000000;
+}
+
+.profile-edit-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.profile-edit-actions button {
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+/* =========================
+   Become Seller Page
+   ========================= */
+.seller-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.seller-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    text-decoration: none;
+    font-size: 1.2rem;
+}
+.seller-home-link:hover {
+    text-decoration: underline;
+}
+.seller-page > h1 {
+    margin-bottom: 0.5rem;
+    font-size: 3rem;
+}
+.seller-introduction {
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 1.2rem;
+}
+.seller-form {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.seller-form-card {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+}
+.seller-form-card h2 {
+    margin-top: 0;
+    font-size: 1.75rem;
+}
+.seller-form-card label {
+    display: block;
+    margin: 1rem 0 0.35rem;
+    font-size: 1.2rem;
+}
+.seller-form-card input,
+.seller-form-card textarea,
+.seller-form-card select {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    font-family: Arial, sans-serif;
+}
+.seller-form-card textarea {
+    resize: vertical;
+}
+.seller-form-card input[type="file"] {
+    padding: 0.25rem 0;
+}
+.seller-form-card p {
+  font-size: 1.2rem;
+}
+.seller-form-card button {
+    padding: 0.6rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ff7070;
+    border: 1px solid #000000;
+}
+/* =========================
+   Notifications Page
+   ========================= */
+.notifications-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.notifications-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.notifications-home-link:hover {
+    text-decoration: underline;
+}
+.notifications-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.notification-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.notification-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.notification-filters button.active {
+    background-color: #cccccc;
+}
+.notification-filters button:hover {
+    background-color: #eeeeee;
+}
+.mark-all-read-button {
+    padding: 0.4rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #ffa9a9;
+    border: 1px solid #000000;
+}
+.mark-all-read-button:hover {
+    background-color: #f8cfcf;
+}
+.notifications-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.notifications-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.notification-message {
+    padding: 4rem;
+    font-size: 2rem;
+}
+.notification-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.notification-card h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.notification-card p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.notification-time {
+    color: #666666;
+    font-size: 1.2rem !important;
+}
+.notification-card a{
+    display: inline-block;
+    margin-bottom: 1.2rem;
+    color: #6060ff;
+    font-size: 1.1rem;
+    text-decoration: underline;
+}
+.notification-card a:hover {
+    text-decoration: none;
+}
+.notification-card button {
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    font-size: 1.2rem;
+}
+.notification-card button:hover {
+    background-color: #eeeeee;
+}
+
+/* =========================
+   My Bids Page
+   ========================= */
+.my-bids-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.my-bids-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.my-bids-home-link:hover {
+    text-decoration: underline;
+}
+.my-bids-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.bid-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.bid-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.bid-filters button.active {
+    background-color: #cccccc;
+}
+.bid-filters button:hover {
+    background-color: #eeeeee;
+}
+.my-bids-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.bids-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.bid-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 3rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.bid-card img {
+    width: 350px;
+    height: 300px;
+    object-fit: cover;
+}
+.bids-list h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.bids-list p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.bids-list button {
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    font-size: 1.2rem;
+}
+.bid-status {
+    font-weight: bold;
+}
+.bid-status-winning {
+    color: rgb(157, 177, 157);
+}
+.bid-status-won {
+    color: darkgreen;
+}
+.bid-status-outbid {
+    color: rgb(248, 136, 136)
+}
+.bid-status-lost {
+    color: red;
+}
+
+/* =========================
+   My Purchases Page
+   ========================= */
+
+.my-purchases-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.my-purchases-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.my-purchases-home-link:hover {
+    text-decoration: underline;
+}
+.my-purchases-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.purchase-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.purchase-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.purchase-filters button.active {
+    background-color: #cccccc;
+}
+.purchase-filters button:hover {
+    background-color: #eeeeee;
+}
+.my-purchases-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.purchases-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.purchase-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 3rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.purchase-card img {
+    width: 350px;
+    height: 300px;
+    object-fit: cover;
+}
+.purchases-list h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.purchases-list p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.purchases-list button {
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    font-size: 1.2rem;
+}
+.purchase-status {
+    font-weight: bold;
+}
+.purchase-status-order-created {
+    color: rgb(210, 92, 1);
+}
+.purchase-status-payment {
+    color: rgb(255, 175, 4);
+}
+.purchase-status-seller-preparing {
+    color: rgb(192, 192, 0);
+}
+.purchase-status-shipped {
+    color: rgb(141, 176, 84);
+}
+.purchase-status-delivered {
+    color: rgb(0, 183, 0);
+}
+.purchase-status-completed {
+    color: darkgreen;
+}
+/* =========================
+   View Order Page
+   ========================= */
+.view-order-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.view-order-home button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    margin-bottom: 1.2rem;
+}
+.view-order-home button:hover {
+    background-color: #eeeeee;
+}
+.view-order-back-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.view-order-back-link:hover {
+    text-decoration: underline;
+}
+.view-order-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.view-order-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.order-details,
+.order-progress {
+    width: min(100%, 900px);
+    margin: 0 auto 1rem;
+    padding: 3rem;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    line-height: 2rem;
+}
+.order-details h2,
+.order-progress h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+.order-details p,
+.order-progress p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.order-progress p.completed {
+    color: darkgreen;
+}
+.order-progress p.not-completed {
+    color: #666666;
+}
+.order-details img {
+    width: 450px;
+    height: 425px;
+    object-fit: cover;
 }
