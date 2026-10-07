@@ -55,7 +55,7 @@ export default async function StorePage({ searchParams }) {
   return (
     <main className="store-layout">
       <img src="/assets/Dependencies2.gif"/>
-      <h1>Absolute cinema CO. gem trading</h1>
+      <h1 className="title">GemBid</h1>
       {/* Top tab */}
       <nav className="store-top-nav" aria-label="Account navigation">
         <ul>
@@ -162,8 +162,16 @@ export default async function StorePage({ searchParams }) {
                   >
                     <article className="store-item">
                       <img src={item.image} alt={item.title} />
+                      <span className={`listing-type-badge ${item.isBid ? "listing-type-badge--bid" : "listing-type-badge--fixed"}`}>
+                        {item.isBid ? "Bidding" : "Buy it now"}
+                      </span>
                       <h2>{item.title}</h2>
-                      <p>{item.description}</p>
+                      <p className="store-item-description">{item.description}</p>
+                      {/* seller detail */}
+                      <div className="listing-seller">
+                        <img src={item.pfp} alt="" />
+                        <span>Sold by {item.seller}</span>
+                      </div>
                       <p className="store-item-price">
                         {new Intl.NumberFormat("en-US", {
                           style: "currency",

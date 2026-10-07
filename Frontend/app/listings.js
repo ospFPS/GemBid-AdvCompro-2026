@@ -1,11 +1,13 @@
-// Prototype item
 const mockItems = [
 	{
 		id: "leek-1",
 		title: "Leek (This is a test item)",
-		description: "A rare gem from the northern caves.",
+		description: "A rare gem from the northern caves. Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah Blah",
 		image: "/assets/Leek.jpg",
 		price: 12.99,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-1",
@@ -13,6 +15,9 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 24.5,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-1",
@@ -20,6 +25,9 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 125.3,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "leek-2",
@@ -27,6 +35,9 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 18,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-2",
@@ -34,6 +45,9 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 31.75,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-2",
@@ -41,6 +55,9 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 132.2,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "leek-3",
@@ -48,6 +65,9 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 15.25,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-3",
@@ -55,6 +75,9 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 42,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-3",
@@ -62,6 +85,9 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 532.1,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 		{
 		id: "leek-4",
@@ -69,6 +95,9 @@ const mockItems = [
 		description: "A rare gem from the northern caves.",
 		image: "/assets/Leek.jpg",
 		price: 16.35,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "amog-4",
@@ -76,6 +105,9 @@ const mockItems = [
 		description: "A gem from mars.",
 		image: "/assets/Reaction.jpg",
 		price: 69.69,
+		isBid: false,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 	{
 		id: "fire-4",
@@ -83,6 +115,9 @@ const mockItems = [
 		description: "A gem from teyvat.",
 		image: "/assets/smirk.png",
 		price: 1253.25,
+		isBid: true,
+		pfp: "/assets/pfp.png",
+		seller: "Garfield",
 	},
 ];
 
@@ -119,4 +154,12 @@ export async function getListings({
 
 export async function getListingById(id) {
 	return mockItems.find((item) => item.id === id) ?? null;
+}
+
+export async function getAllListings() {
+	return mockItems;
+}
+
+export async function getMoreListings(excludedId, limit = 5) {
+	return mockItems.filter((item) => item.id !== excludedId).slice(0, limit);
 }
