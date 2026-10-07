@@ -5,11 +5,11 @@ export default function Home() {
                 <h1>GemBid</h1>
                 <nav>
                     <a href="/store">Marketplace</a>
-                    <a href="/auctions">Auctions</a>
                     <a href="/my-bids">My Bids</a>
                     <a href="/my-purchases">My Purchases</a>
-                    <a href="/notifications">Notifications</a>
+                    <a href="/notification">Notifications</a>
                     <a href="/profile">Profile</a>
+                    <a href="/become-seller?from=home" className="Become-seller">Become a Seller</a>
                 </nav>
 
             </header>
@@ -33,13 +33,6 @@ export default function Home() {
                         </p>
                     </a>
 
-                    <a href="/auctions" className="home-card">
-                        <h3>Auctions</h3>
-                        <p>
-                            View ongoing and upcoming gemstone auctions.
-                        </p>
-                    </a>
-
                     <a href="/my-bids" className="home-card">
                         <h3>My Bids</h3>
                         <p>
@@ -54,7 +47,7 @@ export default function Home() {
                         </p>
                     </a>
 
-                    <a href="/notifications" className="home-card">
+                    <a href="/notification" className="home-card">
                         <h3>Notifications</h3>
                         <p>
                             Check updates about your account and purchases.
@@ -69,7 +62,7 @@ export default function Home() {
                     </a>
 
                     <a
-                        href="/become-seller"
+                        href="/become-seller?from=home"
                         className="home-card seller-card"
                     >
                         <h3>Become a Seller</h3>
