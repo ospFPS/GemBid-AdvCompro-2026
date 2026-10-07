@@ -6,8 +6,8 @@ export default function SignupPage() {
       <form id="signupForm">
         <h1>Sign Up</h1>
         {/* Input */}
-        <label htmlFor="username">Username</label>
-        <input type="text" id="username" name="username" required />
+        <label htmlFor="email">Email</label>
+        <input type="text" id="email" name="email" required />
         <label htmlFor="password">Password</label>
         <input type="password" id="password" name="password" required />
         <label htmlFor="passwordConf">Password confirmation</label>
