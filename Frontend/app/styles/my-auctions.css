@@ -1,0 +1,237 @@
+/* =========================
+My Auctions Page
+========================= */
+.my-auctions-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+    color: #111111;
+}
+.my-auctions-home-link {
+    font-size: 1.2rem;
+    cursor: pointer;
+    text-decoration: none;
+    color: #111111;
+}
+.my-auctions-home-link:hover {
+    text-decoration: underline;
+}
+.my-auctions-heading {
+    margin-bottom: 2rem;
+}
+
+.my-auctions-heading h1 {
+    margin-bottom: 0.75rem;
+    font-size: 3rem;
+}
+
+.my-auctions-heading p {
+    margin: 0;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+/* Auction Filters */
+.my-auctions-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.my-auctions-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    color: #111111;
+}
+
+.my-auctions-filters button.active {
+    background-color: #9b7545;
+    border-color: #9b7545;
+    color: #ffffff;
+}
+.my-auctions-filters button:hover {
+    background-color: #d3b590;
+}
+/* Auctions Grid */
+.my-auctions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+/* Individual Auction Card */
+.my-auction-card {
+    display: flex;
+    gap: 1.5rem;
+    padding: 2rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+.my-auction-card img {
+    width: 17rem;
+    height: 18rem;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+/* Auction Details */
+.my-auction-details {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.my-auction-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    width: 100%;
+    margin-bottom: 0.75rem;
+}
+
+.my-auction-title-row h2 {
+    margin: 0;
+    font-size: 1.75rem;
+}
+
+/* Auction Status */
+.my-auction-status {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border: 1px solid #9b7545;
+    color: #805d32;
+    font-size: 0.95rem;
+    font-weight: bold;
+    line-height: 1.5rem;
+    white-space: nowrap;
+}
+
+.status-active {
+    background-color: #f1e6d6;
+    font-size: 1.2rem;
+}
+
+.status-upcoming {
+    background-color: #f5eddc;
+    font-size: 1.2rem;
+}
+
+.status-ended {
+    background-color: #eee8f5;
+    border-color: #8b78a8;
+    color: #6a5688;
+    font-size: 1.2rem;
+}
+
+.status-sold {
+    background-color: #e2eee3;
+    border-color: #769578;
+    color: #35643a;
+    font-size: 1.2rem;
+}
+
+.status-unsold {
+    background-color: #f8e5e5;
+    border-color: #cc8888;
+    color: #a52a2a;
+    font-size: 1.2rem;
+}
+
+/* Auction Information */
+.my-auction-details p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+    line-height: 1.8rem;
+}
+
+/* View Auction Link */
+.my-auction-view-link {
+    display: inline-block;
+    margin-top: auto;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #9b7545;
+    background-color: #ffffff;
+    color: #805d32;
+    font-size: 1.2rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.my-auction-view-link {
+    background-color: #9b7545;
+    color: #ffffff;
+}
+.my-auction-view-link:hover {
+    background-color: #d3b590;
+}
+
+/* Empty Filter Results */
+.my-auctions-empty {
+    grid-column: 1 / -1;
+    padding: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+/* Tablet */
+@media (max-width: 56.25rem) {
+    .my-auctions-grid {
+    grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile */
+@media (max-width: 37.5rem) {
+    .my-auctions-page {
+        padding: 1rem;
+    }
+
+    .my-auctions-heading h1 {
+        font-size: 2.2rem;
+    }
+
+    .my-auctions-heading p {
+        font-size: 1rem;
+    }
+
+    .my-auctions-filters button {
+        padding: 0.5rem 0.8rem;
+        font-size: 1rem;
+    }
+
+    .my-auction-card {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .my-auction-card img {
+        width: 100%;
+        height: 18rem;
+    }
+
+    .my-auction-title-row h2 {
+        font-size: 1.4rem;
+    }
+
+    .my-auction-details p {
+        font-size: 1rem;
+    }
+
+    .my-auction-view-link {
+        margin-top: 1rem;
+    }
+
+}

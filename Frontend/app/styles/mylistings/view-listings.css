@@ -1,0 +1,140 @@
+
+.view-listing-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.view-listings-home button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    margin-bottom: 1.2rem;
+}
+.view-listings-home button:hover {
+    background-color: #eeeeee;
+}
+.view-listing-back-link {
+    display: inline-block;
+    margin-bottom: 2rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+
+.view-listing-back-link:hover {
+    text-decoration: underline;
+}
+
+.view-listing-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 2.5rem;
+    width: min(100%, 1100px);
+    margin: 0 auto;
+    padding: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+.view-listing-image {
+    flex: 1;
+    min-width: 0;
+}
+
+.view-listing-image img {
+    display: block;
+    width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+}
+
+.view-listing-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.view-listing-details h1 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 2.5rem;
+}
+
+.view-listing-price {
+    margin: 1rem 0;
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.view-listing-details > p {
+    margin: 1rem 0;
+    font-size: 1.2rem;
+    line-height: 1.6;
+}
+
+.view-listing-description,
+.view-listing-auction {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #cccccc;
+}
+
+.view-listing-description h2,
+.view-listing-auction h2 {
+    font-size: 1.75rem;
+}
+
+.view-listing-description p,
+.view-listing-auction p {
+    line-height: 1.7;
+    font-size: 1.2rem;
+}
+
+.view-listing-status {
+    font-weight: bold;
+}
+
+.view-listing-status-active {
+    color: darkgreen;
+}
+
+.view-listing-status-draft {
+    color: #666666;
+}
+
+.view-listing-status-sold {
+    color: #2457a7;
+}
+
+.view-listing-status-unsold {
+    color: #b45309;
+}
+
+.view-listing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+@media (max-width: 700px) {
+    .view-listing-page {
+        padding: 1rem;
+    }
+
+    .view-listing-content {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 1.25rem;
+    }
+
+    .view-listing-image,
+    .view-listing-details {
+        width: 100%;
+    }
+
+    .view-listing-details h1 {
+        font-size: 2rem;
+    }
+}
