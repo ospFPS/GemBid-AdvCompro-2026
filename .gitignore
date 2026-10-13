@@ -1,3 +1,4 @@
 .env
 *.exe
 info.md
+__pycache__/

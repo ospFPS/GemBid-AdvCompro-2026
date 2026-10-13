@@ -4,10 +4,6 @@ import { getListingById } from "../listings";
 import { formatTHB } from "../lib/api";
 import BidForm from "./BidForm";
 
-function formatPrice(price) {
-	return formatTHB(price);
-}
-
 export default async function BidPage({ searchParams }) {
 	const { itemId } = await searchParams;
 	const item = await getListingById(itemId);
@@ -33,7 +29,7 @@ export default async function BidPage({ searchParams }) {
 						<p>{item.description}</p>
 						<p className="bid-listing-price">
 							<span>Current price</span>
-							<strong>{formatPrice(item.price)}</strong>
+							<strong>{formatTHB(item.price)}</strong>
 						</p>
 						<div className="listing-seller">
 							<img src={item.pfp} alt="" />

@@ -13,10 +13,6 @@ import {
 	subscribeToCart,
 } from "./cartStorage";
 
-function formatPrice(price) {
-	return formatTHB(price);
-}
-
 export default function CartContents({ listings }) {
 	const cartSnapshot = useSyncExternalStore(
 		subscribeToCart,
@@ -105,7 +101,7 @@ export default function CartContents({ listings }) {
 								<img src={item.image} alt={item.title} />
 								<span className="cart-item-details">
 									<strong>{item.title}</strong>
-									<span>{formatPrice(item.price)}</span>
+									<span>{formatTHB(item.price)}</span>
 								</span>
 							</Link>
 							<div className="cart-item-controls" aria-label={`${item.title} quantity`}>
@@ -134,11 +130,11 @@ export default function CartContents({ listings }) {
 					<h2 id="cart-summary-heading">Order summary</h2>
 					<p>
 						<span>Items ({itemCount})</span>
-						<strong>{formatPrice(totalPrice)}</strong>
+						<strong>{formatTHB(totalPrice)}</strong>
 					</p>
 					<p className="cart-summary-total">
 						<span>Total</span>
-						<strong>{formatPrice(totalPrice)}</strong>
+						<strong>{formatTHB(totalPrice)}</strong>
 					</p>
 					<button
 						className="item-action-button"

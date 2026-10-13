@@ -6,15 +6,6 @@ export function getToken() {
 	return typeof window === "undefined" ? null : localStorage.getItem("token");
 }
 
-export function getCurrentUser() {
-	if (typeof window === "undefined") return null;
-	try {
-		return JSON.parse(localStorage.getItem("user") ?? "null");
-	} catch {
-		return null;
-	}
-}
-
 export function saveLogin(token, user) {
 	localStorage.setItem("token", token);
 	localStorage.setItem("user", JSON.stringify(user));
