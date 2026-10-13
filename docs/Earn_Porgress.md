@@ -504,7 +504,7 @@ type ListingStatus = "DRAFT" | "PUBLISHED" | "ACTIVE" | "SOLD" | "UNSOLD" | "EXP
 | `GET /api/gems` returns every seller's gems | Filter by `seller_id` on the frontend |
 | `GET /api/listings/{id}` also returns `DRAFT` listings to anyone | Don't link to drafts publicly |
 | No search, filters or pagination on lists | Filter on the frontend (lists are small) |
-| No image upload | Placeholder images |
+| Photos are stored as data URLs in the database (fine for a demo) | Move to object storage if many large photos are uploaded |
 | No CORS | Next.js proxy, already in `next.config.js` |
 | Orders don't include the gem name | Look up `/api/listings/{id}` → `/api/gems/{gem_id}` (done by `gemForListing` in `app/lib/api.js`) |
 | No buyer name on seller orders | Show `Buyer #id` |
@@ -542,7 +542,7 @@ type ListingStatus = "DRAFT" | "PUBLISHED" | "ACTIVE" | "SOLD" | "UNSOLD" | "EXP
 - `app/lib/server.js`: `serverApi()` for server components. It renders per request, never at build time.
 - `app/AccountNav.js`: the store header (shows seller links once the seller is verified).
 
-**Images:** the backend has no image upload, so pages show a photo matched to the gem type (Sapphire, Ruby, Emerald, Diamond, Amethyst, Pearl) from `public/assets`.
+**Images:** Create Listing uploads the seller's photos. They are resized in the browser and stored in `gem_images` through `POST /api/gems/{id}/images`, and the first photo is the main one. Gems with no photo (including the seeded demo data) show a stock photo for their gem type.
 
 **Fixed along the way:** `become-seller` failed `next build` (`useSearchParams` needs a `<Suspense>` boundary). `npm run dev` doesn't catch this, so run `npm run build` before pushing.
 
@@ -623,7 +623,7 @@ BACKEND_URL=http://thalamus:8080 npm run dev
 
 **Expected gaps (not bugs):**
 - Seller Analytics, My Auctions, Edit Listing and Home still show mock data.
-- Photos are chosen by gem type, since there's no image upload yet.
+- Gems without an uploaded photo show a stock photo for their gem type.
 - Seller orders show buyers as "Buyer #id".
 
 **Not merged to `main` yet:** more team code is coming. It will be merged into `Earn_TTB` and tested the same way before anything goes to `main`.
@@ -653,6 +653,7 @@ BACKEND_URL=http://thalamus:8080 npm run dev
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/admin/listings` 🛡️ | Every listing in every status |
+| `POST /api/gems/{id}/images` 💎 owner | `{image_url: "data:image/..."}` (< 2 MB); first image is the main photo. `image_url` is returned on gems, listings and my-bids |
 | `PUT /api/admin/listings/{id}/suspend` 🛡️ | Suspends the listing, records a moderation action and notifies the seller. Shares the suspend logic with report review |
 
 **Database reset:** all data was wiped (schema kept, IDs restart at 1) and reseeded with `backend/db/seed_demo.py`. To reset again on the server:
