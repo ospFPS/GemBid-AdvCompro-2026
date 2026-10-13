@@ -1,4 +1,4 @@
-package main
+package gembid
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// execer is satisfied by both *pgxpool.Pool and pgx.Tx.
 type execer interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
@@ -26,24 +25,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// decodeJSON reads a strict JSON body; on failure it writes 400 and returns false.
-func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(v); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return false
-	}
-	return true
-}
-
 func pathID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	return id, err == nil && id > 0
 }
 
-// notify stores an in-app notification and queues an email for it (outbox).
-// auctionID / listingID / orderID may be 0 when not relevant.
 func notify(
 	ctx context.Context,
 	db execer,
@@ -64,18 +50,13 @@ func notify(
 		SELECT n.notification_id, u.email
 		FROM n
 		INNER JOIN public.users u ON u.user_id = n.user_id
+		WHERE u.email IS NOT NULL AND u.email <> ''
 		`,
 		userID, kind, title, message, auctionID, listingID, orderID,
 	)
 	return err
 }
 
-// ============================================================
-// EMAIL WORKER
-// ============================================================
-
-// StartEmailWorker sends queued emails over SMTP every 30 seconds.
-// Without SMTP_HOST the emails simply stay PENDING in email_deliveries.
 func StartEmailWorker() {
 	host := os.Getenv("SMTP_HOST")
 	if host == "" {
@@ -108,8 +89,6 @@ func StartEmailWorker() {
 	}()
 }
 
-// ponytail: single backend instance assumed (no row locking) and failed emails
-// are not retried; add FOR UPDATE SKIP LOCKED + retry count if you scale out.
 func sendPendingEmails(ctx context.Context, send func(to, subject, body string) error) error {
 	rows, err := DB.Query(
 		ctx,
@@ -156,10 +135,6 @@ func sendPendingEmails(ctx context.Context, send func(to, subject, body string) 
 	return nil
 }
 
-// ============================================================
-// NOTIFICATION ENDPOINTS
-// ============================================================
-
 type NotificationResponse struct {
 	NotificationID int64     `json:"notification_id"`
 	Type           string    `json:"type"`
@@ -172,16 +147,6 @@ type NotificationResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-// ListNotificationsHandler godoc
-// @Summary List my notifications
-// @Description Newest first, max 100. Use ?unread=true for unread only.
-// @Tags Notifications
-// @Produce json
-// @Security BearerAuth
-// @Param unread query bool false "Only unread"
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {string} string
-// @Router /api/notifications [get]
 func ListNotificationsHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 	unreadOnly := r.URL.Query().Get("unread") == "true"
@@ -225,15 +190,6 @@ func ListNotificationsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// MarkNotificationReadHandler godoc
-// @Summary Mark one notification as read
-// @Tags Notifications
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Notification ID"
-// @Success 200 {object} map[string]string
-// @Failure 404 {string} string
-// @Router /api/notifications/{id}/read [put]
 func MarkNotificationReadHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 	id, ok := pathID(r)
@@ -256,13 +212,6 @@ func MarkNotificationReadHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Notification marked as read"})
 }
 
-// MarkAllNotificationsReadHandler godoc
-// @Summary Mark all my notifications as read
-// @Tags Notifications
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} map[string]interface{}
-// @Router /api/notifications/read-all [put]
 func MarkAllNotificationsReadHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 

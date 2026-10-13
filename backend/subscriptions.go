@@ -1,4 +1,4 @@
-package main
+package gembid
 
 import (
 	"context"
@@ -10,8 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Monetization: sellers on FREE can have a limited number of live listings.
-// PRO is a 30-day pass paid with a mock payment; paying again extends it.
 const (
 	proPriceTHB              = 299.00
 	proPeriodDays            = 30
@@ -55,8 +53,6 @@ func scanSubscription(row pgx.Row) (SubscriptionResponse, error) {
 	return s, err
 }
 
-// checkListingQuota returns a non-empty message when a FREE seller is at the live listing limit.
-// ponytail: count-then-insert is not race-proof; two simultaneous publishes can exceed the limit by one.
 func checkListingQuota(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, sellerID int64) (string, error) {
@@ -83,24 +79,10 @@ func checkListingQuota(ctx context.Context, q interface {
 		" live listings. Upgrade to PRO for unlimited listings.", nil
 }
 
-// ListPlansHandler godoc
-// @Summary List subscription plans
-// @Tags Subscriptions
-// @Produce json
-// @Success 200 {array} SubscriptionPlan
-// @Router /api/subscriptions/plans [get]
 func ListPlansHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, plans)
 }
 
-// MySubscriptionHandler godoc
-// @Summary Get my current plan
-// @Tags Subscriptions
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {string} string
-// @Router /api/subscriptions/me [get]
 func MySubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
@@ -124,18 +106,6 @@ func MySubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": "PRO", "subscription": s})
 }
 
-// UpgradeSubscriptionHandler godoc
-// @Summary Upgrade to PRO (mock payment)
-// @Description Pays for 30 days of PRO. If PRO is already active, the end date is extended by 30 days.
-// @Tags Subscriptions
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body UpgradeSubscriptionRequest true "MOCK_CARD or MOCK_QR"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Router /api/subscriptions/upgrade [post]
 func UpgradeSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 	ctx := r.Context()
@@ -157,13 +127,11 @@ func UpgradeSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	// Serialize upgrades per user.
 	if _, err := tx.Exec(ctx, `SELECT 1 FROM public.users WHERE user_id = $1 FOR UPDATE`, userID); err != nil {
 		http.Error(w, "Could not lock user", http.StatusInternalServerError)
 		return
 	}
 
-	// Lazily expire a lapsed PRO so the one-ACTIVE-per-user index allows a new one.
 	if _, err := tx.Exec(ctx,
 		`UPDATE public.subscriptions SET status = 'EXPIRED'
 		 WHERE user_id = $1 AND status = 'ACTIVE' AND end_date < CURRENT_DATE`, userID); err != nil {

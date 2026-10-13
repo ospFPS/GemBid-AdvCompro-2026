@@ -1,414 +1,494 @@
-# GemBid Backend Progress — Earn
+# GemBid — Earn Progress + Frontend API Guide
 
-**Project:** GemBid — Gem Marketplace & Auction Platform
 **Date:** 5 October 2026
-**Branch:** `Earn_TTB`
-**Builds on:** Oshi's week 1 backend (`main` @ `8e83949`), merged into `Earn_TTB`
+**Branch:** `Earn_refactor` (from `main` @ `0ea8465`)
+
+This document has two parts:
+
+1. **Progress** — what changed in the backend this round (a cleanup, no API change).
+2. **Frontend API Guide** — everything the frontend team needs to call the backend.
+
+> **Frontend team:** jump to [Part 2](#part-2--frontend-api-guide).
 
 ---
 
-# 1. Summary
+# Part 1 — Progress
 
-This update adds the remaining commerce features on top of the existing
-authentication, seller, gem, listing and auction engine.
+## 1.1 Summary
 
-| Feature | Status |
+| Item | Status |
 |---|---|
-| Order + Buy Now System | ✅ |
-| Payment / Transaction System (mock) | ✅ |
-| Shipping System | ✅ |
-| Notification + Email System | ✅ (email sending needs SMTP settings) |
-| Admin Analytics | ✅ |
-| Subscription / Monetization (FREE / PRO) | ✅ |
-| Auction Finalization / Automatic Closing | ✅ |
-| Deploy script for the Ubuntu server | ✅ |
+| Team's `main` (Oshi week 2) deployed to the Ubuntu server | ✅ |
+| Migrations 019–021 confirmed applied on the database | ✅ |
+| Backend cleanup — less duplicated code, **no API change** | ✅ |
+| All 8 integration tests pass | ✅ |
+| Live vs. refactored responses compared — identical | ✅ |
+| Frontend API guide (this document, Part 2) | ✅ |
 
-All features passed automated integration tests against the project database.
+## 1.2 Backend cleanup
 
----
+The same behaviour in **405 fewer lines** (597 removed, 192 added across 12 files).
+Endpoints, request bodies, responses, status codes and error messages are unchanged.
 
-# 2. Commits on `Earn_TTB`
-
-| Commit | Description |
+| Change | Where |
 |---|---|
-| `98fa7f2` | Merge `main` into `Earn_TTB` (brings in auction engine, Swagger, Docker) |
-| `f7a0171` | Orders, payments, shipping, notifications, subscriptions, analytics, auto auction close |
-| `0a087c8` | `deploy.sh` for the server |
-| `5a61f32` | Code simplification (shorter, same behaviour, re-tested) |
+| `decodeJSON` writes the `400 Invalid JSON` itself; callers are one line | 17 handlers |
+| All JSON responses go through `writeJSON` | 27 places |
+| `pathID` for `{id}` parsing where the check was already identical | 7 handlers |
+| Removed impossible "Unauthorized" checks after the auth middleware | 15 handlers |
+| Shared `userColumns` + `scanUser` instead of 4 copies | `auth.go`, `middleware.go` |
+| Shared `auctionColumns`, `gemColumns` instead of 7 copies | `auction.go`, `gem*.go` |
+| Auction activation SQL reused instead of 2 pasted copies | `auction.go` |
+| `pgx.CollectRows` instead of 5 hand-written row loops (also checks row errors) | `auction.go`, `admin.go`, `listings.go`, `gem_handlers.go` |
+| Username regex compiled once; `strings.Cut` for the auth header (still accepts `Bearer` in any case); dead JWT checks removed | `auth.go`, `middleware.go` |
 
----
+Deliberately **not** changed (they would change visible behaviour): report creation and
+moderation logic, the two report list response shapes, and the package layout.
 
-# 3. Files
+## 1.3 Verification
 
-New:
+**Integration tests** (real database, test data cleaned up afterwards):
 
 ```text
-backend/orders.go                    Orders, Buy Now, payment, shipping
-backend/notifications.go             Notifications, email outbox + SMTP worker, shared helpers
-backend/subscriptions.go             FREE / PRO plans, upgrade, listing quota
-backend/orders_integration_test.go   End-to-end test for the new features
-backend/db/migrations/019_orders_payments_shipping_notifications_subscriptions.sql
-deploy.sh                            One-command server deployment
+--- PASS: TestAuctionEngineTwoBidderFlow
+--- PASS: TestAutomaticAuctionCloser
+--- PASS: TestFreeListingQuotaConcurrentPublish
+--- PASS: TestFullAPIEndToEnd
+--- PASS: TestReportMigration020Applies
+--- PASS: TestOrderPaymentShippingFlow
+--- PASS: TestReportModerationFlow
+--- PASS: TestSecurityValidationGuards
+ok  adcompro-backend/test  67.190s
 ```
 
-Changed:
+**Side-by-side check:** the refactored build ran on port 8081 next to the live server
+on 8080. 28 requests (public lists and details, missing and invalid IDs, every auth header
+variant, malformed JSON, bad credentials, validation errors) returned **identical status,
+headers and body** on both. Logged-in `/api/me` with `Bearer`, `bearer` and `BEARER`
+also matched.
 
-```text
-backend/auction.go                   Shared finalizeAuction, auto closer, outbid notification, quota
-backend/admin.go                     Admin analytics endpoint
-backend/listings.go                  FREE listing quota on publish
-backend/main.go                      New routes, background workers
-backend/auction_integration_test.go  Checks winner order + outbid notifications
-backend/docs/*                       Regenerated Swagger
-.gitignore                           Ignore *.exe build output
-```
+Static checks: `go build`, `go vet`, `gofmt` ✅
+
+## 1.4 Deployment state
+
+- The server currently runs `main` @ `0ea8465`.
+- `Earn_refactor` is pushed for review. Once merged into `main`, redeploy with
+  `git checkout main && git pull && docker compose up -d --build`.
+- No database change is needed.
 
 ---
 
-# 4. Database — Migration 019
+# Part 2 — Frontend API Guide
 
-The tables (`orders`, `transactions`, `shipping`, `notifications`,
-`email_deliveries`, `subscriptions`) already existed from migrations 010–017.
-Migration 019 adds the rules they were missing. It runs inside one transaction
-(all-or-nothing) and **has already been applied** to the project database.
+## 2.1 Connecting to the backend
 
-| Table | Change |
+| Environment | Backend URL |
 |---|---|
-| `orders` | Status limited to `PENDING_PAYMENT`, `PAID`, `SHIPPED`, `DELIVERED`, `CANCELLED` (default `PENDING_PAYMENT`) |
-| `orders` | Unique index: one non-cancelled order per listing (prevents double Buy Now) |
-| `transactions` | `order_id` now nullable, new `subscription_id`; each payment belongs to exactly one order **or** one subscription |
-| `transactions` | Status limited to `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED` |
-| `shipping` | Status limited to `PENDING`, `SHIPPED`, `DELIVERED` |
-| `email_deliveries` | Status limited to `PENDING`, `SENT`, `FAILED`; index for pending emails |
-| `subscriptions` | Status limited to `ACTIVE`, `CANCELLED`, `EXPIRED`; one ACTIVE subscription per user |
+| Local backend | `http://localhost:8080` |
+| Team server (Tailscale) | `http://thalamus:8080` |
+| Public (ngrok) | `https://angular-snorkel-passive.ngrok-free.dev` |
+| Interactive docs (Swagger) | `<backend>/docs` |
 
----
+### ⚠️ Use a Next.js proxy — the backend does not send CORS headers
 
-# 5. Order + Buy Now System
+A browser `fetch` from `localhost:3000` straight to `:8080` **will be blocked**: the
+backend answers the CORS preflight with `405`. Proxy instead, so the browser only
+talks to the Next.js origin. In `Frontend/next.config.js`:
 
-```text
-Buy Now / Auction win
-        ↓
-PENDING_PAYMENT ──(buyer cancels)──→ CANCELLED
-        ↓ pay
-      PAID
-        ↓ seller ships
-     SHIPPED
-        ↓ buyer confirms
-    DELIVERED
+```js
+const path = require("node:path");
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  outputFileTracingRoot: path.join(__dirname),
+  async rewrites() {
+    const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
+    return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
+  },
+};
+
+module.exports = nextConfig;
 ```
 
-| Endpoint | Who | Description |
+Then call **relative** paths from the frontend: `fetch("/api/login", ...)`.
+Set `BACKEND_URL` in `.env.local` to switch servers (for example `http://thalamus:8080`).
+
+> Don't create Next.js API routes under `/api/...`; they would shadow the proxy.
+> If you call the ngrok URL directly (not through the proxy), add the header
+> `ngrok-skip-browser-warning: 1`, or ngrok returns its HTML warning page.
+
+## 2.2 Conventions
+
+| Topic | Rule |
+|---|---|
+| Request body | JSON. **Unknown fields are rejected** (`400 Invalid JSON`), so send only the documented fields. |
+| Success response | JSON |
+| **Error response** | **Plain text**, not JSON, e.g. `Listing not found`. Read it with `await res.text()`. |
+| Dates | ISO 8601 strings, e.g. `2026-10-05T11:18:26Z`. Send auction times the same way. |
+| Money | JSON numbers in THB with 2 decimals, e.g. `12500` or `5250.5` |
+| `null` | Optional fields come back as `null` (e.g. `email`, `phone`, `reserve_price`) |
+| IDs | Positive integers. `0`, negative or non-numeric IDs → `400` or `404` |
+
+Common status codes:
+
+| Code | Meaning | Frontend action |
 |---|---|---|
-| `POST /api/listings/{id}/buy` | Logged-in user | Buy a PUBLISHED fixed-price listing. Listing becomes `SOLD`, order `PENDING_PAYMENT` |
-| `GET /api/orders` | Logged-in user | My orders as buyer; `?as=seller` for orders on my shop |
-| `GET /api/orders/{id}` | Buyer, seller, admin | Order + shipping + payment transactions |
-| `POST /api/orders/{id}/cancel` | Buyer | Cancel unpaid order. Fixed-price listing returns to `PUBLISHED`, auction listing becomes `UNSOLD` |
+| 200 / 201 | OK / created | |
+| 400 | Invalid input (message says why) | Show the message on the form |
+| 401 | Not logged in / token expired | Clear the token, go to login |
+| 403 | Logged in but not allowed (not seller/admin/owner, or plan limit) | Show the message |
+| 404 | Not found | |
+| 409 | Conflict with current state (already sold, already reviewed, bid too low…) | Show the message, refresh the data |
+
+## 2.3 Authentication
+
+1. `POST /api/login` returns `token`.
+2. Store it (e.g. `localStorage`) and send it on every protected call:
+   `Authorization: Bearer <token>`
+3. The token lasts **24 hours**. There is no refresh endpoint, so on `401` send the user to login.
+4. `GET /api/me` returns the current user. Use `role` and `seller_status` to decide what to show:
+
+| User type | How to detect | Can use |
+|---|---|---|
+| Visitor | no token | Public endpoints |
+| User | `role = "USER"` | + buying, bidding, orders, notifications, reports, profile, subscription |
+| Verified seller | `seller_status = "VERIFIED"` | + gems, listings, auctions, shipping |
+| Admin | `role = "ADMIN"` | + admin endpoints |
+
+### Minimal fetch helper
+
+```ts
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  if (res.status === 401) localStorage.removeItem("token");
+  if (!res.ok) throw new Error(await res.text()); // errors are plain text
+  return res.json();
+}
+
+// const { token, user } = await api<{ token: string; user: User }>("/api/login",
+//   { method: "POST", body: JSON.stringify({ username, password }) });
+```
+
+## 2.4 Endpoint reference
+
+**Auth column:** 🌐 public · 👤 logged in · 💎 verified seller · 🛡️ admin
+
+### Account
+
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| POST | `/api/register` | 🌐 | `{username, password, full_name?, email?, phone?}` | `201 {message, user}` |
+| POST | `/api/login` | 🌐 | `{username, password}` | `{message, token, user}` |
+| GET | `/api/me` | 👤 | | `User` |
+| PUT | `/api/me` | 👤 | `{full_name, username?, phone?}` | `{message, user}` |
+| PUT | `/api/me/password` | 👤 | `{current_password, new_password}` | `{message}` |
 
 Rules:
+- `username`: 3–30 characters of `a-z 0-9 . _ -`, stored in lowercase.
+- `password`: 8–72 characters.
+- `full_name` defaults to the username; max lengths are full_name 150, email 255, phone 30.
+- On `PUT /api/me`, an empty `phone` clears it and an empty `username` keeps the current one.
 
-- A seller cannot buy their own listing (403).
-- The listing row is locked during Buy Now, and the unique index blocks a second order (409).
-- Only unpaid orders can be cancelled.
+```ts
+type User = {
+  user_id: number; username: string; full_name: string;
+  email: string | null; phone: string | null;
+  role: "USER" | "ADMIN";
+  seller_status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED" | "SUSPENDED";
+  created_at: string;
+};
+```
 
----
+### Becoming a seller
 
-# 6. Payment / Transaction System
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| POST | `/api/seller/apply` | 👤 | `{shop_name, legal_name, seller_type?, address?, description?}` | `201 {message, application}` |
+| GET | `/api/seller/status` | 👤 | | `{seller_status, application}` (`application` is `null` if never applied) |
+| GET | `/api/admin/seller-applications` | 🛡️ | | `{applications, count}` |
+| PUT | `/api/admin/seller-applications/{id}` | 🛡️ | `{decision: "APPROVE" \| "REJECT"}` | `{message, seller_id, user_id, decision, verification_status, reviewed_by}` |
 
-Payments are **simulated** (no real money), as allowed by the requirements.
+Flow: apply → `PENDING` → admin approves → `VERIFIED` (seller pages unlock). Only `PENDING` applications can be reviewed.
 
-| Endpoint | Who | Description |
-|---|---|---|
-| `POST /api/orders/{id}/pay` | Buyer | Pay with `MOCK_CARD` or `MOCK_QR` and give the shipping address |
+### Gems (seller inventory)
 
-Request:
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/api/gems` | 🌐 | | `Gem[]` (all gems, newest first) |
+| GET | `/api/gems/{id}` | 🌐 | | `Gem` |
+| POST | `/api/gems` | 💎 | `GemInput` | `201 {message, gem}` |
+| PUT | `/api/gems/{id}` | 💎 owner | `GemInput` (full replace) | `{message, gem}` |
+| DELETE | `/api/gems/{id}` | 💎 owner | | `{message}` |
+
+```ts
+type GemInput = {
+  gem_name: string; gem_type: string;            // required
+  carat?: number; length?: number; width?: number; height?: number; // > 0
+  shape?: string; color?: string; clarity?: string;
+  origin?: string; treatment?: string; description?: string;
+};
+// Gem = GemInput fields (optional ones may be null) + gem_id, seller_id, created_at, updated_at
+```
+
+A gem **cannot be edited** while it has a published, active, sold or suspended listing (`409`),
+and cannot be deleted while a listing references it (`409`).
+
+### Listings
+
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/api/listings` | 🌐 | | `ListingItem[]` (only `PUBLISHED`/`ACTIVE`) |
+| GET | `/api/listings/{id}` | 🌐 | | `Listing` |
+| POST | `/api/listings` | 💎 | `{gem_id}` | `201 {message, listing}` (status `DRAFT`) |
+| PUT | `/api/listings/{id}/publish` | 💎 owner | see below | `{message, listing}` |
+| DELETE | `/api/listings/{id}` | 💎 owner | | `{message}` (only while `DRAFT`) |
+
+Publish body:
+- Fixed price: `{"sale_type": "FIXED_PRICE", "fixed_price": 12500}` → listing becomes `PUBLISHED`.
+- Auction: `{"sale_type": "AUCTION"}` → stays `DRAFT` until you call `POST /api/auctions`.
+
+```ts
+type ListingItem = { listing_id: number; gem_id: number; gem_name: string; gem_type: string;
+  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null };
+type Listing = { listing_id: number; gem_id: number; seller_id: number;
+  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null;
+  created_at: string; published_at: string | null; updated_at: string;
+  relisted_from_listing_id: number | null };
+```
+
+**FREE plan limit:** a seller on FREE can have **5 live listings**. The 6th publish (fixed price or
+auction) returns `403` with an upgrade message. Show an "Upgrade to PRO" button.
+
+### Auctions and bids
+
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/api/auctions` | 🌐 | | `AuctionItem[]` (`SCHEDULED` + `ACTIVE`, active first) |
+| GET | `/api/auctions/{id}` | 🌐 | | `Auction` |
+| GET | `/api/auctions/{id}/bids` | 🌐 | | `Bid[]` (newest first) |
+| POST | `/api/auctions` | 💎 owner | see below | `201 {message, auction}` |
+| POST | `/api/auctions/{id}/bids` | 👤 | `{bid_amount}` | `201 {message, bid, current_price, next_minimum_bid}` |
+| POST | `/api/auctions/{id}/close` | 💎 owner | | `{message, auction, order_id?}` |
+
+Create body (listing must be a `DRAFT` with `sale_type = "AUCTION"`):
 
 ```json
 {
-  "payment_method": "MOCK_CARD",
-  "shipping_address": "123 Sukhumvit Rd, Bangkok 10110"
+  "listing_id": 12,
+  "starting_price": 5000,
+  "minimum_increment": 250,
+  "reserve_price": 6000,
+  "start_time": "2026-10-06T09:00:00Z",
+  "end_time": "2026-10-07T09:00:00Z"
 }
 ```
 
-In one database transaction the backend:
+`reserve_price` is optional (it can be `null`); if given, it must be ≥ `starting_price`. `end_time` must be after `start_time` and in the future.
 
-1. Records a `transactions` row (`SUCCESS`, reference `MOCK-xxxxxxxxxxxxxxxx`, `paid_at`).
-2. Sets the order to `PAID`.
-3. Creates the `shipping` row with the address (`PENDING`).
-4. Notifies the seller (payment received) and the buyer (payment successful).
+Bidding rules:
+- First bid ≥ `starting_price`; after that ≥ `current_price + minimum_increment`. Show `next_minimum_bid` from the last bid response.
+- A seller cannot bid on their own auction (`403`). Bids before start or after end return `409`.
+- The previous leader gets an `OUTBID` notification.
 
-Paying twice returns 409.
+**Closing is automatic.** The backend closes ended auctions every 30 seconds. If the reserve is met, the winner gets a `PENDING_PAYMENT` order and an `AUCTION_WON` notification; otherwise the listing becomes `UNSOLD`. The `close` endpoint is only a manual shortcut.
 
----
+For a live view, poll `GET /api/auctions/{id}` every few seconds. There is no websocket.
 
-# 7. Shipping System
-
-| Endpoint | Who | Description |
-|---|---|---|
-| `PUT /api/orders/{id}/ship` | Verified seller (owner) | Add courier + tracking number. Order and shipping become `SHIPPED` |
-| `POST /api/orders/{id}/confirm-delivery` | Buyer | Order and shipping become `DELIVERED` |
-
-Ship request:
-
-```json
-{
-  "courier": "Kerry Express",
-  "tracking_number": "KEX123456789TH"
-}
+```ts
+type Auction = { auction_id: number; listing_id: number; starting_price: number;
+  minimum_increment: number; reserve_price: number | null; current_price: number;
+  current_highest_bidder_id: number | null; start_time: string; end_time: string;
+  status: "SCHEDULED" | "ACTIVE" | "ENDED"; winner_id: number | null;
+  winning_bid_id: number | null; created_at: string; closed_at: string | null };
+type AuctionItem = { auction_id: number; listing_id: number; gem_id: number; gem_name: string;
+  gem_type: string; starting_price: number; minimum_increment: number; current_price: number;
+  current_highest_bidder_id: number | null; start_time: string; end_time: string; status: string };
+type Bid = { bid_id: number; auction_id: number; bidder_id: number; bid_amount: number;
+  bid_time: string; bid_status: "ACCEPTED" | "OUTBID" | "WON" | "RESERVE_NOT_MET" };
 ```
 
-The buyer is notified with the courier and tracking number; the seller is
-notified when delivery is confirmed.
+### Orders, payment and shipping
 
----
-
-# 8. Notification + Email System
-
-Every notification is stored in `notifications` **and** queued in
-`email_deliveries` (outbox pattern) in the same database transaction as the
-action that caused it.
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/notifications` | Newest first (max 100) + `unread_count`; `?unread=true` for unread only |
-| `PUT /api/notifications/{id}/read` | Mark one as read |
-| `PUT /api/notifications/read-all` | Mark all as read |
-
-Notification types:
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| POST | `/api/listings/{id}/buy` | 👤 | | `201 Order` (Buy Now on a `PUBLISHED` fixed-price listing) |
+| GET | `/api/orders` | 👤 | | `Order[]` I bought; `?as=seller` → orders on my shop |
+| GET | `/api/orders/{id}` | 👤 buyer/seller/admin | | `OrderDetail` |
+| POST | `/api/orders/{id}/pay` | 👤 buyer | `{payment_method, shipping_address}` | `OrderDetail` |
+| POST | `/api/orders/{id}/cancel` | 👤 buyer | | `OrderDetail` (unpaid only) |
+| PUT | `/api/orders/{id}/ship` | 💎 seller | `{courier, tracking_number}` | `OrderDetail` |
+| POST | `/api/orders/{id}/confirm-delivery` | 👤 buyer | | `OrderDetail` |
 
 ```text
-ORDER_CREATED          seller   Buy Now order placed
-PAYMENT_RECEIVED       seller   buyer paid
-PAYMENT_SUCCESS        buyer    payment done
-ORDER_SHIPPED          buyer    courier + tracking number
-ORDER_DELIVERED        seller   buyer confirmed delivery
-ORDER_CANCELLED        seller   buyer cancelled unpaid order
-OUTBID                 bidder   someone placed a higher bid
-AUCTION_WON            winner   pay for your order
-AUCTION_SOLD           seller   auction ended with a winner
-AUCTION_LOST           bidders  auction ended, you did not win
-AUCTION_UNSOLD         seller   no winner / reserve not met
-AUCTION_RESERVE_NOT_MET bidder  highest bid below reserve
-SUBSCRIPTION_ACTIVATED user     PRO active until <date>
+Buy Now / auction win → PENDING_PAYMENT ──pay──→ PAID ──ship──→ SHIPPED ──confirm──→ DELIVERED
+                              └──cancel──→ CANCELLED (listing becomes available again)
 ```
 
-## Email sending
+- `payment_method` is `"MOCK_CARD"` or `"MOCK_QR"`. Payment is simulated; no real money moves.
+- `shipping_address` is required (max 5000 characters); `courier` max 100, `tracking_number` max 150.
+- Buying your own listing returns `403`; buying a listing that's already sold returns `409`.
 
-A background worker sends pending emails over SMTP every 30 seconds and marks
-them `SENT` or `FAILED`. It only runs when these are set in `.env`:
-
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...      # e.g. a Gmail app password
-SMTP_FROM=...
+```ts
+type Order = { order_id: number; listing_id: number; buyer_id: number; seller_id: number;
+  auction_id: number | null; winning_bid_id: number | null; item_price: number;
+  shipping_fee: number; total_amount: number;
+  status: "PENDING_PAYMENT" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+  created_at: string; updated_at: string };
+type OrderDetail = {
+  order: Order;
+  shipping: { shipping_id: number; courier: string | null; tracking_number: string | null;
+    shipping_address: string; status: "PENDING" | "SHIPPED" | "DELIVERED";
+    shipped_at: string | null; delivered_at: string | null; updated_at: string } | null;
+  transactions: { transaction_id: number; order_id: number | null; subscription_id: number | null;
+    amount: number; payment_method: string | null; status: "PENDING" | "SUCCESS" | "FAILED" | "REFUNDED";
+    reference_number: string | null; created_at: string; paid_at: string | null }[];
+};
 ```
 
-Without `SMTP_HOST`, emails stay `PENDING` in `email_deliveries` and are sent
-once SMTP is configured.
+### Notifications
 
----
-
-# 9. Auction Finalization / Automatic Closing
-
-Previously an auction only closed when the seller called the close endpoint, and
-no order was created for the winner.
-
-Now:
-
-- A background job runs **every 30 seconds**. It activates scheduled auctions
-  whose start time has passed and finalizes every auction whose `end_time` has
-  passed.
-- `POST /api/auctions/{id}/close` still works and uses the **same**
-  `finalizeAuction` code.
-- Both paths lock the auction row, so an auction can never be closed twice.
-
-```text
-end_time passed
-      ↓
-Reserve met and has bids?
- ├── YES → bid WON, listing SOLD, auction ENDED
- │         PENDING_PAYMENT order for winner
- │         notify winner, seller, losing bidders
- └── NO  → listing UNSOLD, auction ENDED
-           notify seller (+ highest bidder if reserve not met)
-```
-
-Bidding also now sends an `OUTBID` notification to the previous highest bidder.
-
----
-
-# 10. Subscription / Monetization
-
-| Plan | Price | Live listings | Features |
+| Method | Path | Auth | Response |
 |---|---|---|---|
-| FREE | ฿0 | 5 | Browse, bid, buy, sell up to 5 live listings |
-| PRO | ฿299 / 30 days | Unlimited | Everything in FREE + unlimited live listings |
+| GET | `/api/notifications` | 👤 | `{notifications, unread_count}` (newest 100; `?unread=true` for unread only) |
+| PUT | `/api/notifications/{id}/read` | 👤 | `{message}` |
+| PUT | `/api/notifications/read-all` | 👤 | `{message, updated}` |
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/subscriptions/plans` | Public plan list |
-| `GET /api/subscriptions/me` | My current plan |
-| `POST /api/subscriptions/upgrade` | Mock payment (`MOCK_CARD` / `MOCK_QR`) for 30 days of PRO |
+```ts
+type Notification = { notification_id: number; type: NotificationType; title: string;
+  message: string; auction_id: number | null; listing_id: number | null;
+  order_id: number | null; is_read: boolean; created_at: string };
+```
 
-Rules:
+Use `order_id` / `auction_id` / `listing_id` to link a notification to its page. Poll
+`unread_count` for the bell badge.
 
-- Paying again while PRO is active extends the end date by 30 days.
-- The payment is stored in `transactions` with `subscription_id`.
-- A lapsed PRO is marked `EXPIRED` on the next upgrade.
-- A FREE seller with 5 live (`PUBLISHED` / `ACTIVE`) listings gets **403** when
-  publishing a fixed-price listing or creating an auction.
+| `type` | Sent to | When |
+|---|---|---|
+| `ORDER_CREATED` | seller | Buy Now order placed |
+| `PAYMENT_RECEIVED` | seller | Buyer paid |
+| `PAYMENT_SUCCESS` | buyer | Payment done |
+| `ORDER_SHIPPED` | buyer | Seller shipped (message includes the tracking number) |
+| `ORDER_DELIVERED` | seller | Buyer confirmed delivery |
+| `ORDER_CANCELLED` | seller | Buyer cancelled an unpaid order |
+| `OUTBID` | bidder | Someone bid higher |
+| `AUCTION_WON` | winner | Won; link to the order to pay |
+| `AUCTION_SOLD` | seller | Auction ended with a winner |
+| `AUCTION_LOST` | other bidders | Auction ended |
+| `AUCTION_UNSOLD` | seller | No winner / reserve not met |
+| `AUCTION_RESERVE_NOT_MET` | top bidder | Highest bid below reserve |
+| `SUBSCRIPTION_ACTIVATED` | user | PRO active |
+| `MODERATION_WARNING` | reported user | Admin warning |
+| `REPORT_REVIEWED` | reporter | Their report was handled |
 
-Prices and limits are constants at the top of `backend/subscriptions.go`.
+### Subscription (FREE / PRO)
 
----
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/api/subscriptions/plans` | 🌐 | | `Plan[]` |
+| GET | `/api/subscriptions/me` | 👤 | | `{plan: "FREE", subscription: null}` or `{plan: "PRO", subscription}` |
+| POST | `/api/subscriptions/upgrade` | 👤 | `{payment_method}` | `{message, subscription, transaction}` |
 
-# 11. Admin Analytics
+| Plan | Price | Live listings |
+|---|---|---|
+| FREE | ฿0 | 5 |
+| PRO | ฿299 / 30 days | Unlimited |
 
-`GET /api/admin/analytics` (admin only, 403 for others) returns one JSON report:
+Paying again while PRO is active adds 30 days. Render the plans page from `GET /api/subscriptions/plans` rather than hard-coding prices.
+
+### Reports and moderation
+
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| POST | `/api/reports` | 👤 | `{reason, description?, ` **one of** `reported_user_id \| listing_id \| auction_id}` | `201 Report` |
+| GET | `/api/reports` | 👤 | | `Report[]` (my reports) |
+| GET | `/api/admin/reports` | 🛡️ | | `{reports, count}`; `?status=PENDING` (default) `\|RESOLVED\|REJECTED\|ALL` |
+| PUT | `/api/admin/reports/{id}` | 🛡️ | `{decision, action?, reason?}` | `{message, report, action}` |
+| GET | `/api/admin/moderation-actions` | 🛡️ | | `ModerationAction[]` |
+
+- `reason`: required, max 150 characters. `description`: max 2000.
+- You can't report yourself, your own listing or your own auction (`409`).
+- `decision`: `"RESOLVE"` or `"REJECT"`. `action` (only with RESOLVE): `"NONE"` (default), `"WARN_USER"`, `"SUSPEND_LISTING"`, `"SUSPEND_SELLER"`.
+- Report `status`: `PENDING`, `RESOLVED` or `REJECTED`.
+
+> Note the shapes differ: `GET /api/reports` returns a **plain array**, while `GET /api/admin/reports` returns `{reports, count}`.
+
+### Admin analytics
+
+`GET /api/admin/analytics` 🛡️ returns one object for the dashboard:
 
 ```text
-users                      total, admins, new in last 30 days, sellers by status
+generated_at
+users                     { total, admins, new_last_30_days, sellers_by_status: {NONE: n, ...} }
 gems_total
-listings_by_status
-auctions_by_status
+listings_by_status        { PUBLISHED: n, SOLD: n, ... }
+auctions_by_status        { ACTIVE: n, ENDED: n, ... }
 bids_total
-orders_by_status
-sales                      paid orders, gross merchandise value, average order value
-subscriptions              active PRO count, subscription revenue
-emails_by_status
-top_gem_types_sold         top 5 by revenue
-daily_sales_last_30_days   orders + revenue per day
+orders_by_status          { PAID: n, DELIVERED: n, ... }
+sales                     { paid_orders, gross_merchandise_value, average_order_value }
+subscriptions             { active_pro, revenue }
+emails_by_status          { PENDING: n, SENT: n, ... }
+top_gem_types_sold        [ { gem_type, orders, revenue } ]   (top 5)
+daily_sales_last_30_days  [ { day, orders, revenue } ]        (only days with sales)
 ```
 
-PostgreSQL builds the whole report in a single query.
+The `*_by_status` objects only contain statuses that have rows, so treat missing keys as 0.
 
----
+### Other
 
-# 12. Testing
+| Method | Path | Auth | Response |
+|---|---|---|---|
+| GET | `/health` | 🌐 | `{status: "ok"}` |
+| GET | `/docs` | 🌐 | Swagger UI |
 
-## Automated integration tests (against the project database)
+## 2.5 Status values
 
-```bash
-RUN_AUCTION_INTEGRATION=1 go test -count=1 -v ./...
+```ts
+type ListingStatus = "DRAFT" | "PUBLISHED" | "ACTIVE" | "SOLD" | "UNSOLD" | "EXPIRED" | "CANCELLED" | "SUSPENDED";
 ```
 
-On the server (uses the server `.env`, nothing installed):
-
-```bash
-cd /srv/Adv_Compro_Project/GemBid-AdvCompro-2026
-docker run --rm --env-file .env -e RUN_AUCTION_INTEGRATION=1 \
-  -v "$PWD/backend":/app -w /app golang:1.26-alpine go test -count=1 -v ./...
-```
-
-`TestOrderPaymentShippingFlow` (new) checks:
-
-```text
-Seller buys own listing           → 403 ✅
-Buyer Buy Now                     → 201 PENDING_PAYMENT ✅
-Second Buy Now                    → 409 ✅
-Seller pays buyer's order         → 403 ✅
-Invalid payment method            → 400 ✅
-Buyer pays                        → PAID + shipping PENDING + 1 SUCCESS transaction ✅
-Pay again / cancel paid order     → 409 ✅
-Buyer tries to ship               → 403 ✅
-Confirm before shipping           → 409 ✅
-Seller ships                      → SHIPPED ✅
-Buyer confirms                    → DELIVERED ✅
-Admin views order                 → 200 ✅
-Buy + cancel second listing       → CANCELLED, listing PUBLISHED again ✅
-Buyer notifications               → PAYMENT_SUCCESS, ORDER_SHIPPED, unread > 0 ✅
-Email queued per notification     → ✅
-Upgrade twice                     → same subscription, +30 days ✅
-Plan                              → PRO ✅
-Analytics as buyer / admin        → 403 / 200 with all sections ✅
-```
-
-`TestAuctionEngineTwoBidderFlow` (extended) now also checks:
-
-```text
-Winner order created              → PENDING_PAYMENT, buyer = winner, total 5500 ✅
-OUTBID notifications              → 2 ✅
-```
-
-Latest result (after the simplification commit):
-
-```text
---- PASS: TestAuctionEngineTwoBidderFlow (13.35s)
---- PASS: TestOrderPaymentShippingFlow (16.43s)
-PASS
-```
-
-Test records are deleted automatically after each run. A database check after
-the first run confirmed no leftover test rows.
-
-## Static checks
-
-```text
-go build .     ✅
-go vet ./...   ✅
-go test ./...  ✅
-Swagger regenerated ✅
-```
-
-## Manual testing
-
-Swagger UI: `http://thalamus:8080/docs`. Each new endpoint is listed under
-the tags Orders, Payments, Shipping, Notifications, Subscriptions and Admin.
-
----
-
-# 13. Deployment
-
-Production runs on the Ubuntu server (`thalamus`) with Docker Compose in
-`/srv/Adv_Compro_Project/GemBid-AdvCompro-2026`, inside the `gembid` tmux
-session. ngrok exposes it publicly.
-
-New `deploy.sh`:
-
-```bash
-./deploy.sh                                   # pull, rebuild, restart, health check
-./deploy.sh backend/db/migrations/020_x.sql   # also apply a migration first
-```
-
-It:
-
-1. Pulls the current branch (`git pull --ff-only`).
-2. Applies any migration files given (inside a throwaway Postgres container, using `.env`).
-3. Runs `docker compose up -d --build` (detached, so it survives closing tmux).
-4. Waits up to 30 s for `/health`; prints the last 50 log lines on failure.
-5. Starts ngrok only if it is not already running (fixes the `ERR_NGROK_334` duplicate-tunnel error).
-
-Deploy `Earn_TTB`:
-
-```bash
-git fetch && git checkout Earn_TTB && ./deploy.sh && docker compose logs -f --tail 20 backend
-```
-
----
-
-# 14. Known Limitations / Not Built Yet
-
-| Item | Note |
+| Listing status | Meaning |
 |---|---|
-| Unpaid order timeout | Unpaid orders do not auto-cancel; buyer must cancel |
-| Refunds | Only unpaid orders can be cancelled; no refund flow |
-| Cancel subscription | PRO simply expires after 30 days; no cancel endpoint |
-| PRO seller analytics | Only admin analytics exists |
-| Listing quota race | Two simultaneous publishes can exceed the FREE limit by one |
-| Email retries | Failed emails are marked `FAILED` and not retried |
-| Real payments | Mock only (`MOCK_CARD`, `MOCK_QR`); Stripe Test Mode not integrated |
-| Public DRAFT listing detail | Earlier known issue from week 1, still open |
+| `DRAFT` | Created, not visible to buyers |
+| `PUBLISHED` | Fixed-price listing for sale, or auction scheduled for the future |
+| `ACTIVE` | Auction running |
+| `SOLD` | Bought (Buy Now) or auction won |
+| `UNSOLD` | Auction ended with no winner, or the winner cancelled |
+| `SUSPENDED` | Removed by an admin |
 
----
+## 2.6 Page → endpoint cheat sheet
 
-# 15. Next Steps
+| Page | Calls |
+|---|---|
+| Login / Register | `POST /api/login`, `POST /api/register` |
+| Navbar | `GET /api/me`, `GET /api/notifications?unread=true` |
+| Marketplace | `GET /api/listings`, `GET /api/auctions` |
+| Listing detail | `GET /api/listings/{id}`, `GET /api/gems/{gem_id}`, `POST /api/listings/{id}/buy` |
+| Auction detail | `GET /api/auctions/{id}`, `GET /api/auctions/{id}/bids`, `POST /api/auctions/{id}/bids` |
+| Checkout | `GET /api/orders/{id}`, `POST /api/orders/{id}/pay` |
+| My orders | `GET /api/orders`, `POST /api/orders/{id}/confirm-delivery`, `POST /api/orders/{id}/cancel` |
+| Profile | `GET/PUT /api/me`, `PUT /api/me/password` |
+| Become a seller | `GET /api/seller/status`, `POST /api/seller/apply` |
+| Seller dashboard | `POST/PUT/DELETE /api/gems`, `POST /api/listings`, `PUT /api/listings/{id}/publish`, `POST /api/auctions`, `GET /api/orders?as=seller`, `PUT /api/orders/{id}/ship` |
+| Pricing | `GET /api/subscriptions/plans`, `GET /api/subscriptions/me`, `POST /api/subscriptions/upgrade` |
+| Report button | `POST /api/reports` |
+| Admin | `/api/admin/*` endpoints above |
 
-```text
-1. Deploy Earn_TTB to thalamus and test in Swagger
-2. Add SMTP settings to .env to start sending emails
-3. Merge Earn_TTB into main after team review
-4. Connect the Next.js frontend to the new endpoints
-5. Optional: unpaid-order timeout, refunds, PRO seller analytics
-```
+## 2.7 Known gaps (tell the backend team if you need these)
+
+| Gap | Workaround for now |
+|---|---|
+| No "my listings" endpoint for sellers; `GET /api/listings` only shows published or active ones | Keep the `listing_id` from create/publish responses |
+| `GET /api/gems` returns every seller's gems | Filter by `seller_id` on the frontend |
+| `GET /api/listings/{id}` also returns `DRAFT` listings to anyone | Don't link to drafts publicly |
+| No search, filters or pagination on lists | Filter on the frontend (lists are small) |
+| No image upload | Placeholder images |
+| No CORS | Use the Next.js proxy (section 2.1) |
+| No refresh token (24h expiry) | Re-login on `401` |

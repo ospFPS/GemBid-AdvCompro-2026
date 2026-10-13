@@ -1,6 +1,7 @@
-package main
+package test
 
 import (
+	. "adcompro-backend"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"time"
 )
 
-// Buy Now -> pay -> ship -> deliver, cancel, notifications, PRO upgrade, admin analytics.
 func TestOrderPaymentShippingFlow(t *testing.T) {
 	if os.Getenv("RUN_AUCTION_INTEGRATION") != "1" {
 		t.Skip("set RUN_AUCTION_INTEGRATION=1 to run database integration test")
@@ -36,8 +36,8 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	newUser := func(name, role string) int64 {
 		var id int64
 		if err := DB.QueryRow(ctx,
-			`INSERT INTO public.users (full_name, email, password_hash, role) VALUES ($1, $2, 'x', $3) RETURNING user_id`,
-			name, fmt.Sprintf("order-it-%s-%d@test.local", name, suffix), role,
+			`INSERT INTO public.users (username, full_name, email, password_hash, role) VALUES ($1, $2, $3, 'x', $4) RETURNING user_id`,
+			fmt.Sprintf("ord_%s_%d", name, suffix%1000000000), name, fmt.Sprintf("order-it-%s-%d@test.local", name, suffix), role,
 		).Scan(&id); err != nil {
 			t.Fatalf("create %s: %v", name, err)
 		}
@@ -114,7 +114,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 		return d.Order.Status
 	}
 
-	// --- Buy Now ---
 	call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), seller, nil, http.StatusForbidden)
 	var order OrderResponse
 	if err := json.Unmarshal(call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), buyer, nil, http.StatusCreated), &order); err != nil {
@@ -126,7 +125,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), buyer, nil, http.StatusConflict)
 	orderPath := fmt.Sprintf("/api/orders/%d", order.OrderID)
 
-	// --- Payment ---
 	pay := map[string]any{"payment_method": "MOCK_CARD", "shipping_address": "1 Test Rd, Bangkok"}
 	call("POST", orderPath+"/pay", seller, pay, http.StatusForbidden)
 	call("POST", orderPath+"/pay", buyer, map[string]any{"payment_method": "CASH", "shipping_address": "x"}, http.StatusBadRequest)
@@ -142,7 +140,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	call("POST", orderPath+"/pay", buyer, pay, http.StatusConflict)
 	call("POST", orderPath+"/cancel", buyer, nil, http.StatusConflict)
 
-	// --- Shipping ---
 	ship := map[string]any{"courier": "Thailand Post", "tracking_number": "EF123456789TH"}
 	call("PUT", orderPath+"/ship", buyer, ship, http.StatusForbidden)
 	call("POST", orderPath+"/confirm-delivery", buyer, nil, http.StatusConflict)
@@ -154,7 +151,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	}
 	call("GET", orderPath, admin, nil, http.StatusOK)
 
-	// --- Cancel releases the listing ---
 	var orderB OrderResponse
 	if err := json.Unmarshal(call("POST", fmt.Sprintf("/api/listings/%d/buy", listingB), buyer, nil, http.StatusCreated), &orderB); err != nil {
 		t.Fatal(err)
@@ -168,7 +164,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 		t.Fatalf("cancelled order should republish listing, got %s", listingStatus)
 	}
 
-	// --- Notifications ---
 	var inbox struct {
 		Notifications []NotificationResponse `json:"notifications"`
 		UnreadCount   int                    `json:"unread_count"`
@@ -193,7 +188,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	}
 	call("PUT", "/api/notifications/read-all", buyer, nil, http.StatusOK)
 
-	// --- Subscription ---
 	upgrade := map[string]any{"payment_method": "MOCK_QR"}
 	var first, second struct {
 		Subscription SubscriptionResponse `json:"subscription"`
@@ -201,7 +195,7 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	_ = json.Unmarshal(call("POST", "/api/subscriptions/upgrade", buyer, upgrade, http.StatusOK), &first)
 	_ = json.Unmarshal(call("POST", "/api/subscriptions/upgrade", buyer, upgrade, http.StatusOK), &second)
 	if first.Subscription.SubscriptionID != second.Subscription.SubscriptionID ||
-		second.Subscription.EndDate.Sub(*first.Subscription.EndDate) != proPeriodDays*24*time.Hour {
+		second.Subscription.EndDate.Sub(*first.Subscription.EndDate) != 30*24*time.Hour {
 		t.Fatalf("second upgrade should extend the same subscription: %+v / %+v", first, second)
 	}
 	var me struct {
@@ -212,7 +206,6 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 		t.Fatalf("expected PRO, got %s", me.Plan)
 	}
 
-	// --- Admin analytics ---
 	call("GET", "/api/admin/analytics", buyer, nil, http.StatusForbidden)
 	var report map[string]any
 	if err := json.Unmarshal(call("GET", "/api/admin/analytics", admin, nil, http.StatusOK), &report); err != nil {

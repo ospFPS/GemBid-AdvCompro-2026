@@ -1,4 +1,4 @@
-package main
+package gembid
 
 import (
 	"context"
@@ -11,11 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
-
-// Order lifecycle:
-//
-//	Buy Now / Auction win -> PENDING_PAYMENT -> PAID -> SHIPPED -> DELIVERED
-//	PENDING_PAYMENT -> CANCELLED (buyer cancels, listing is released)
 
 type OrderResponse struct {
 	OrderID      int64     `json:"order_id"`
@@ -85,12 +80,10 @@ func scanOrder(row pgx.Row) (OrderResponse, error) {
 
 var validPaymentMethods = map[string]bool{"MOCK_CARD": true, "MOCK_QR": true}
 
-// mockPayment simulates a successful payment gateway call.
 func mockPayment() string {
 	return "MOCK-" + rand.Text()[:16]
 }
 
-// createOrder inserts a PENDING_PAYMENT order. auctionID / winningBidID may be 0.
 func createOrder(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -110,24 +103,6 @@ func createOrder(
 	))
 }
 
-// ============================================================
-// POST /api/listings/{id}/buy
-// ============================================================
-
-// BuyNowHandler godoc
-// @Summary Buy Now
-// @Description Buy a PUBLISHED fixed-price listing. Creates a PENDING_PAYMENT order and reserves the listing (SOLD).
-// @Tags Orders
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Listing ID"
-// @Success 201 {object} OrderResponse
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/listings/{id}/buy [post]
 func BuyNowHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 	listingID, ok := pathID(r)
@@ -206,20 +181,6 @@ func BuyNowHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, order)
 }
 
-// ============================================================
-// GET /api/orders, GET /api/orders/{id}
-// ============================================================
-
-// ListOrdersHandler godoc
-// @Summary List my orders
-// @Description Orders I bought. Use ?as=seller for orders on my shop.
-// @Tags Orders
-// @Produce json
-// @Security BearerAuth
-// @Param as query string false "buyer (default) or seller"
-// @Success 200 {array} OrderResponse
-// @Failure 401 {string} string
-// @Router /api/orders [get]
 func ListOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
@@ -245,17 +206,6 @@ func ListOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, orders)
 }
 
-// GetOrderHandler godoc
-// @Summary Get order detail
-// @Description Order with shipping and payment transactions. Visible to the buyer, the seller and admins.
-// @Tags Orders
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Order ID"
-// @Success 200 {object} OrderDetailResponse
-// @Failure 401 {string} string
-// @Failure 404 {string} string
-// @Router /api/orders/{id} [get]
 func GetOrderHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 	orderID, ok := pathID(r)
@@ -264,7 +214,6 @@ func GetOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buyer, seller or admin only; anyone else gets 404.
 	order, err := scanOrder(DB.QueryRow(
 		r.Context(),
 		`
@@ -337,10 +286,6 @@ func scanTransaction(row pgx.CollectableRow) (TransactionResponse, error) {
 	return t, err
 }
 
-// ============================================================
-// ORDER STATE TRANSITIONS
-// ============================================================
-
 type lockedOrder struct {
 	OrderResponse
 	SellerUserID int64
@@ -351,8 +296,6 @@ type httpErr struct {
 	msg    string
 }
 
-// transitionOrder locks the order row, runs step inside the transaction,
-// commits, and responds with the updated order detail.
 func transitionOrder(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -422,21 +365,6 @@ func dbFail(msg string) *httpErr {
 	return &httpErr{http.StatusInternalServerError, msg}
 }
 
-// PayOrderHandler godoc
-// @Summary Pay for an order (mock payment)
-// @Description Buyer pays a PENDING_PAYMENT order with MOCK_CARD or MOCK_QR and gives the shipping address. Order becomes PAID and a shipping record is created.
-// @Tags Payments
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Order ID"
-// @Param request body PayOrderRequest true "Payment method and shipping address"
-// @Success 200 {object} OrderDetailResponse
-// @Failure 400 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/orders/{id}/pay [post]
 func PayOrderHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
@@ -452,6 +380,10 @@ func PayOrderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.ShippingAddress == "" {
 		http.Error(w, "shipping_address is required", http.StatusBadRequest)
+		return
+	}
+	if len(request.ShippingAddress) > 5000 {
+		http.Error(w, "shipping_address is too long", http.StatusBadRequest)
 		return
 	}
 
@@ -497,18 +429,6 @@ func PayOrderHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CancelOrderHandler godoc
-// @Summary Cancel an unpaid order
-// @Description Buyer cancels a PENDING_PAYMENT order. A fixed-price listing goes back to PUBLISHED; an auction listing becomes UNSOLD.
-// @Tags Orders
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Order ID"
-// @Success 200 {object} OrderDetailResponse
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/orders/{id}/cancel [post]
 func CancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 
@@ -542,21 +462,6 @@ func CancelOrderHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ShipOrderHandler godoc
-// @Summary Mark an order as shipped
-// @Description Seller adds courier and tracking number to a PAID order.
-// @Tags Shipping
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Order ID"
-// @Param request body ShipOrderRequest true "Courier and tracking number"
-// @Success 200 {object} OrderDetailResponse
-// @Failure 400 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/orders/{id}/ship [put]
 func ShipOrderHandler(w http.ResponseWriter, r *http.Request) {
 	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
@@ -568,6 +473,10 @@ func ShipOrderHandler(w http.ResponseWriter, r *http.Request) {
 	request.TrackingNumber = strings.TrimSpace(request.TrackingNumber)
 	if request.Courier == "" || request.TrackingNumber == "" {
 		http.Error(w, "courier and tracking_number are required", http.StatusBadRequest)
+		return
+	}
+	if len(request.Courier) > 100 || len(request.TrackingNumber) > 150 {
+		http.Error(w, "courier or tracking_number is too long", http.StatusBadRequest)
 		return
 	}
 
@@ -603,18 +512,6 @@ func ShipOrderHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ConfirmDeliveryHandler godoc
-// @Summary Confirm delivery
-// @Description Buyer confirms a SHIPPED order has arrived. Order and shipping become DELIVERED.
-// @Tags Shipping
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Order ID"
-// @Success 200 {object} OrderDetailResponse
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/orders/{id}/confirm-delivery [post]
 func ConfirmDeliveryHandler(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(userIDKey).(int64)
 

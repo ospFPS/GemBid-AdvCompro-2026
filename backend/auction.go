@@ -1,8 +1,7 @@
-package main
+package gembid
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"math"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type CreateAuctionRequest struct {
@@ -72,6 +70,11 @@ func roundMoney(v float64) float64 {
 	return math.Round(v*100) / 100
 }
 
+const auctionColumns = `auction_id, listing_id, starting_price, minimum_increment,
+	reserve_price, current_price, current_highest_bidder_id,
+	start_time, end_time, status, winner_id, winning_bid_id,
+	created_at, closed_at`
+
 func scanAuction(row pgx.Row, auction *AuctionResponse) error {
 	return row.Scan(
 		&auction.AuctionID,
@@ -91,33 +94,11 @@ func scanAuction(row pgx.Row, auction *AuctionResponse) error {
 	)
 }
 
-// CreateAuctionHandler godoc
-// @Summary Create an auction
-// @Description Configure an AUCTION draft listing with starting price, increment, optional reserve price, and start/end times.
-// @Tags Auctions
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body CreateAuctionRequest true "Auction configuration"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/auctions [post]
 func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request CreateAuctionRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -132,16 +113,17 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "listing_id is required", http.StatusBadRequest)
 		return
 	}
-	if request.StartingPrice < 0 {
-		http.Error(w, "starting_price must be >= 0", http.StatusBadRequest)
+	if request.StartingPrice < 0 || request.StartingPrice > 9999999999.99 {
+		http.Error(w, "starting_price is outside the supported money range", http.StatusBadRequest)
 		return
 	}
-	if request.MinimumIncrement <= 0 {
-		http.Error(w, "minimum_increment must be > 0", http.StatusBadRequest)
+	if request.MinimumIncrement <= 0 || request.MinimumIncrement > 9999999999.99 {
+		http.Error(w, "minimum_increment is outside the supported money range", http.StatusBadRequest)
 		return
 	}
-	if request.ReservePrice != nil && *request.ReservePrice < request.StartingPrice {
-		http.Error(w, "reserve_price must be >= starting_price", http.StatusBadRequest)
+	if request.ReservePrice != nil &&
+		(*request.ReservePrice < request.StartingPrice || *request.ReservePrice > 9999999999.99) {
+		http.Error(w, "reserve_price must be >= starting_price and within the supported money range", http.StatusBadRequest)
 		return
 	}
 	if request.StartTime.IsZero() || request.EndTime.IsZero() {
@@ -157,12 +139,20 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := DB.BeginTx(r.Context(), pgx.TxOptions{})
+	tx, err := DB.Begin(r.Context())
 	if err != nil {
 		http.Error(w, "Could not start auction transaction", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(r.Context())
+
+	if _, err := tx.Exec(r.Context(),
+		`SELECT 1 FROM public.seller_profiles WHERE seller_id = $1 FOR UPDATE`,
+		sellerID,
+	); err != nil {
+		http.Error(w, "Could not lock seller account", http.StatusInternalServerError)
+		return
+	}
 
 	var ownerID int64
 	var saleType string
@@ -199,7 +189,6 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Set the listing sale_type to AUCTION before creating the auction", http.StatusConflict)
 		return
 	}
-
 	if msg, err := checkListingQuota(r.Context(), tx, sellerID); err != nil {
 		http.Error(w, "Could not check listing quota", http.StatusInternalServerError)
 		return
@@ -231,12 +220,7 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 				status
 			)
 			VALUES ($1, $2, $3, $4, $2, $5, $6, $7)
-			RETURNING
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			`,
+			RETURNING `+auctionColumns,
 			request.ListingID,
 			request.StartingPrice,
 			request.MinimumIncrement,
@@ -249,8 +233,7 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if isPGError(err, "23505") {
 			http.Error(w, "This listing already has an auction", http.StatusConflict)
 			return
 		}
@@ -280,22 +263,12 @@ func CreateAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Auction created",
 		"auction": auction,
 	})
 }
 
-// ListAuctionsHandler godoc
-// @Summary Browse auctions
-// @Description Public endpoint returning scheduled and active auctions.
-// @Tags Auctions
-// @Produce json
-// @Success 200 {array} AuctionListItem
-// @Failure 500 {string} string
-// @Router /api/auctions [get]
 func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
 	activateDueAuctions(r.Context(), 0)
 
@@ -328,12 +301,9 @@ func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not fetch auctions", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	auctions := []AuctionListItem{}
-	for rows.Next() {
+	auctions, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (AuctionListItem, error) {
 		var item AuctionListItem
-		if err := rows.Scan(
+		err := row.Scan(
 			&item.AuctionID,
 			&item.ListingID,
 			&item.GemID,
@@ -346,30 +316,20 @@ func ListAuctionsHandler(w http.ResponseWriter, r *http.Request) {
 			&item.StartTime,
 			&item.EndTime,
 			&item.Status,
-		); err != nil {
-			http.Error(w, "Could not read auction data", http.StatusInternalServerError)
-			return
-		}
-		auctions = append(auctions, item)
+		)
+		return item, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read auction data", http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(auctions)
+	writeJSON(w, http.StatusOK, auctions)
 }
 
-// GetAuctionHandler godoc
-// @Summary Get auction details
-// @Description Public endpoint returning one auction.
-// @Tags Auctions
-// @Produce json
-// @Param id path int true "Auction ID"
-// @Success 200 {object} AuctionResponse
-// @Failure 400 {string} string
-// @Failure 404 {string} string
-// @Router /api/auctions/{id} [get]
 func GetAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
@@ -377,18 +337,10 @@ func GetAuctionHandler(w http.ResponseWriter, r *http.Request) {
 	activateDueAuctions(r.Context(), auctionID)
 
 	var auction AuctionResponse
-	err = scanAuction(
+	err := scanAuction(
 		DB.QueryRow(
 			r.Context(),
-			`
-			SELECT
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			FROM public.auctions
-			WHERE auction_id = $1
-			`,
+			`SELECT `+auctionColumns+` FROM public.auctions WHERE auction_id = $1`,
 			auctionID,
 		),
 		&auction,
@@ -402,24 +354,12 @@ func GetAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(auction)
+	writeJSON(w, http.StatusOK, auction)
 }
 
-// ListAuctionBidsHandler godoc
-// @Summary Get auction bid history
-// @Description Public endpoint returning bids for one auction, newest first.
-// @Tags Auctions
-// @Produce json
-// @Param id path int true "Auction ID"
-// @Success 200 {array} BidResponse
-// @Failure 400 {string} string
-// @Failure 404 {string} string
-// @Failure 500 {string} string
-// @Router /api/auctions/{id}/bids [get]
 func ListAuctionBidsHandler(w http.ResponseWriter, r *http.Request) {
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
@@ -452,73 +392,47 @@ func ListAuctionBidsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not fetch bids", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	bids := []BidResponse{}
-	for rows.Next() {
+	bids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (BidResponse, error) {
 		var bid BidResponse
-		if err := rows.Scan(
+		err := row.Scan(
 			&bid.BidID,
 			&bid.AuctionID,
 			&bid.BidderID,
 			&bid.BidAmount,
 			&bid.BidTime,
 			&bid.BidStatus,
-		); err != nil {
-			http.Error(w, "Could not read bid data", http.StatusInternalServerError)
-			return
-		}
-		bids = append(bids, bid)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(bids)
-}
-
-// PlaceBidHandler godoc
-// @Summary Place a bid
-// @Description Place a concurrency-safe bid on an active auction. The seller cannot bid on their own auction.
-// @Tags Auctions
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Auction ID"
-// @Param request body PlaceBidRequest true "Bid amount"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/auctions/{id}/bids [post]
-func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(int64)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		)
+		return bid, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read bid data", http.StatusInternalServerError)
 		return
 	}
 
-	auctionID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || auctionID <= 0 {
+	writeJSON(w, http.StatusOK, bids)
+}
+
+func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(userIDKey).(int64)
+
+	auctionID, ok := pathID(r)
+	if !ok {
 		http.Error(w, "Invalid auction ID", http.StatusBadRequest)
 		return
 	}
 
 	var request PlaceBidRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
 	request.BidAmount = roundMoney(request.BidAmount)
-	if request.BidAmount <= 0 {
-		http.Error(w, "bid_amount must be > 0", http.StatusBadRequest)
+	if request.BidAmount <= 0 || request.BidAmount > 9999999999.99 {
+		http.Error(w, "bid_amount is outside the supported money range", http.StatusBadRequest)
 		return
 	}
 
-	tx, err := DB.BeginTx(r.Context(), pgx.TxOptions{})
+	tx, err := DB.Begin(r.Context())
 	if err != nil {
 		http.Error(w, "Could not start bid transaction", http.StatusInternalServerError)
 		return
@@ -616,11 +530,7 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if request.BidAmount < minimumBid {
-		http.Error(
-			w,
-			"Bid is below the minimum allowed amount of "+strconv.FormatFloat(minimumBid, 'f', 2, 64),
-			http.StatusConflict,
-		)
+		http.Error(w, "Bid is below the minimum allowed amount of "+strconv.FormatFloat(minimumBid, 'f', 2, 64), http.StatusConflict)
 		return
 	}
 
@@ -634,7 +544,6 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Could not update previous bid", http.StatusInternalServerError)
 			return
 		}
-
 		if previousBidderID != userID {
 			if err := notify(r.Context(), tx, previousBidderID, "OUTBID", "You have been outbid",
 				"Someone bid "+formatTHB(request.BidAmount)+" on an auction you were leading. Bid again to win it.",
@@ -694,9 +603,7 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 
 	nextMinimum := roundMoney(request.BidAmount + minimumIncrement)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message":          "Bid accepted",
 		"bid":              bid,
 		"current_price":    request.BidAmount,
@@ -704,26 +611,8 @@ func PlaceBidHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CloseAuctionHandler godoc
-// @Summary Close an ended auction
-// @Description Seller closes an auction after end_time (the backend also does this automatically every 30s). Reserve price is checked; a winner gets a PENDING_PAYMENT order, otherwise the listing becomes UNSOLD.
-// @Tags Auctions
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Auction ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/auctions/{id}/close [post]
 func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	auctionID, ok := pathID(r)
 	if !ok {
@@ -781,15 +670,7 @@ func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
 	err = scanAuction(
 		DB.QueryRow(
 			r.Context(),
-			`
-			SELECT
-				auction_id, listing_id, starting_price, minimum_increment,
-				reserve_price, current_price, current_highest_bidder_id,
-				start_time, end_time, status, winner_id, winning_bid_id,
-				created_at, closed_at
-			FROM public.auctions
-			WHERE auction_id = $1
-			`,
+			`SELECT `+auctionColumns+` FROM public.auctions WHERE auction_id = $1`,
 			auctionID,
 		),
 		&auction,
@@ -808,13 +689,8 @@ func CloseAuctionHandler(w http.ResponseWriter, r *http.Request) {
 		response["order_id"] = result.OrderID
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, response)
 }
-
-// ============================================================
-// AUCTION FINALIZATION
-// ============================================================
 
 var (
 	errAuctionAlreadyClosed = errors.New("Auction is already closed")
@@ -830,10 +706,6 @@ func formatTHB(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64) + " THB"
 }
 
-// finalizeAuction closes an auction whose end_time has passed. If the reserve
-// is met the highest bid WINS, the listing becomes SOLD and a PENDING_PAYMENT
-// order is created for the winner; otherwise the listing becomes UNSOLD.
-// Seller and bidders are notified. Caller owns the transaction.
 func finalizeAuction(ctx context.Context, tx pgx.Tx, auctionID int64) (auctionResult, error) {
 	var result auctionResult
 	var listingID, sellerID, sellerUserID int64
@@ -984,8 +856,6 @@ func finalizeAuction(ctx context.Context, tx pgx.Tx, auctionID int64) (auctionRe
 	return result, nil
 }
 
-// activateDueAuctions moves SCHEDULED auctions whose start_time has passed to ACTIVE.
-// auctionID 0 means all auctions.
 func activateDueAuctions(ctx context.Context, auctionID int64) {
 	_, _ = DB.Exec(
 		ctx,
@@ -1008,18 +878,16 @@ func activateDueAuctions(ctx context.Context, auctionID int64) {
 	)
 }
 
-// StartAuctionCloser activates and finalizes due auctions every 30 seconds,
-// so auctions close on time without the seller pressing "close".
 func StartAuctionCloser() {
 	go func() {
 		for {
-			closeDueAuctions(context.Background())
+			CloseDueAuctions(context.Background())
 			time.Sleep(30 * time.Second)
 		}
 	}()
 }
 
-func closeDueAuctions(ctx context.Context) {
+func CloseDueAuctions(ctx context.Context) {
 	activateDueAuctions(ctx, 0)
 
 	rows, err := DB.Query(ctx,

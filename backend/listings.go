@@ -1,19 +1,12 @@
-package main
+package gembid
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
-
-// ============================================================
-// LISTING RESPONSE
-// ============================================================
 
 type ListingResponse struct {
 	ListingID             int64      `json:"listing_id"`
@@ -28,43 +21,24 @@ type ListingResponse struct {
 	RelistedFromListingID *int64     `json:"relisted_from_listing_id"`
 }
 
-// ============================================================
-// POST /api/listings  (seller-owned — create a DRAFT listing for a gem)
-// ============================================================
-
 type CreateListingRequest struct {
 	GemID int64 `json:"gem_id"`
 }
 
-// CreateListingHandler godoc
-// @Summary Create a draft listing
-// @Description Create a DRAFT listing for a gemstone owned by the authenticated verified seller.
-// @Tags Listings
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body CreateListingRequest true "Gem to list"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Router /api/listings [post]
-func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
+func scanListing(row pgx.Row, listing *ListingResponse) error {
+	return row.Scan(
+		&listing.ListingID, &listing.GemID, &listing.SellerID, &listing.SaleType,
+		&listing.Status, &listing.FixedPrice, &listing.CreatedAt, &listing.PublishedAt,
+		&listing.UpdatedAt, &listing.RelistedFromListingID,
+	)
+}
 
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	var request CreateListingRequest
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -73,7 +47,6 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Confirm the gem exists AND belongs to this seller before creating a listing for it.
 	var gemOwnerID int64
 
 	err := DB.QueryRow(
@@ -99,7 +72,7 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 
 	var listing ListingResponse
 
-	err = DB.QueryRow(
+	err = scanListing(DB.QueryRow(
 		r.Context(),
 		`
 		INSERT INTO public.listings (gem_id, seller_id)
@@ -109,28 +82,18 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 			created_at, published_at, updated_at, relisted_from_listing_id
 		`,
 		request.GemID, sellerID,
-	).Scan(
-		&listing.ListingID, &listing.GemID, &listing.SellerID, &listing.SaleType,
-		&listing.Status, &listing.FixedPrice, &listing.CreatedAt, &listing.PublishedAt,
-		&listing.UpdatedAt, &listing.RelistedFromListingID,
-	)
+	), &listing)
 
 	if err != nil {
 		http.Error(w, "Could not create listing", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Draft listing created",
 		"listing": listing,
 	})
 }
-
-// ============================================================
-// GET /api/listings  (public — browse published/active listings)
-// ============================================================
 
 type ListingListItem struct {
 	ListingID  int64    `json:"listing_id"`
@@ -142,14 +105,6 @@ type ListingListItem struct {
 	FixedPrice *float64 `json:"fixed_price"`
 }
 
-// ListListingsHandler godoc
-// @Summary Browse marketplace listings
-// @Description Public endpoint returning PUBLISHED and ACTIVE listings.
-// @Tags Listings
-// @Produce json
-// @Success 200 {array} ListingListItem
-// @Failure 500 {string} string
-// @Router /api/listings [get]
 func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := DB.Query(
 		r.Context(),
@@ -167,42 +122,22 @@ func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not fetch listings", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	listings := []ListingListItem{}
-
-	for rows.Next() {
+	listings, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ListingListItem, error) {
 		var item ListingListItem
-
-		if err := rows.Scan(
+		err := row.Scan(
 			&item.ListingID, &item.GemID, &item.GemName, &item.GemType,
 			&item.SaleType, &item.Status, &item.FixedPrice,
-		); err != nil {
-			http.Error(w, "Could not read listing data", http.StatusInternalServerError)
-			return
-		}
-
-		listings = append(listings, item)
+		)
+		return item, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read listing data", http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(listings)
+	writeJSON(w, http.StatusOK, listings)
 }
 
-// ============================================================
-// GET /api/listings/{id}  (public — single listing detail)
-// ============================================================
-
-// GetListingHandler godoc
-// @Summary Get listing details
-// @Description Return one listing by listing_id, including its current status.
-// @Tags Listings
-// @Produce json
-// @Param id path int true "Listing ID"
-// @Success 200 {object} ListingResponse
-// @Failure 400 {string} string
-// @Failure 404 {string} string
-// @Router /api/listings/{id} [get]
 func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 	listingID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
@@ -213,7 +148,7 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 
 	var listing ListingResponse
 
-	err = DB.QueryRow(
+	err = scanListing(DB.QueryRow(
 		r.Context(),
 		`
 		SELECT
@@ -223,11 +158,7 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE listing_id = $1
 		`,
 		listingID,
-	).Scan(
-		&listing.ListingID, &listing.GemID, &listing.SellerID, &listing.SaleType,
-		&listing.Status, &listing.FixedPrice, &listing.CreatedAt, &listing.PublishedAt,
-		&listing.UpdatedAt, &listing.RelistedFromListingID,
-	)
+	), &listing)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "Listing not found", http.StatusNotFound)
@@ -239,41 +170,16 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(listing)
+	writeJSON(w, http.StatusOK, listing)
 }
 
-// ============================================================
-// PUT /api/listings/{id}/publish  (seller-owned — DRAFT -> chosen sale type)
-// ============================================================
-
 type PublishListingRequest struct {
-	SaleType   string   `json:"sale_type"` // "FIXED_PRICE" or "AUCTION"
+	SaleType   string   `json:"sale_type"`
 	FixedPrice *float64 `json:"fixed_price"`
 }
 
-// PublishListingHandler godoc
-// @Summary Publish or configure a draft listing
-// @Description For FIXED_PRICE, sets the price and publishes. For AUCTION, records AUCTION while leaving the listing DRAFT until POST /api/auctions supplies auction settings.
-// @Tags Listings
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Listing ID"
-// @Param request body PublishListingRequest true "Sale type and optional fixed price"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 409 {string} string
-// @Router /api/listings/{id}/publish [put]
 func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	listingID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
@@ -284,11 +190,7 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 
 	var request PublishListingRequest
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !decodeJSON(w, r, &request) {
 		return
 	}
 
@@ -297,12 +199,26 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 	switch request.SaleType {
 
 	case "FIXED_PRICE":
-		if request.FixedPrice == nil || *request.FixedPrice < 0 {
-			http.Error(w, "fixed_price is required and must be >= 0 for FIXED_PRICE listings", http.StatusBadRequest)
+		if request.FixedPrice == nil || *request.FixedPrice < 0 || *request.FixedPrice > 9999999999.99 {
+			http.Error(w, "fixed_price must be between 0 and 9999999999.99", http.StatusBadRequest)
 			return
 		}
 
-		if msg, err := checkListingQuota(r.Context(), DB, sellerID); err != nil {
+		tx, txErr := DB.Begin(r.Context())
+		if txErr != nil {
+			http.Error(w, "Could not start listing transaction", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		if _, txErr = tx.Exec(r.Context(),
+			`SELECT 1 FROM public.seller_profiles WHERE seller_id = $1 FOR UPDATE`,
+			sellerID,
+		); txErr != nil {
+			http.Error(w, "Could not lock seller account", http.StatusInternalServerError)
+			return
+		}
+		if msg, txErr := checkListingQuota(r.Context(), tx, sellerID); txErr != nil {
 			http.Error(w, "Could not check listing quota", http.StatusInternalServerError)
 			return
 		} else if msg != "" {
@@ -310,7 +226,7 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = DB.QueryRow(
+		err = scanListing(tx.QueryRow(
 			r.Context(),
 			`
 			UPDATE public.listings
@@ -322,11 +238,10 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 				created_at, published_at, updated_at, relisted_from_listing_id
 			`,
 			*request.FixedPrice, listingID, sellerID,
-		).Scan(
-			&listing.ListingID, &listing.GemID, &listing.SellerID, &listing.SaleType,
-			&listing.Status, &listing.FixedPrice, &listing.CreatedAt, &listing.PublishedAt,
-			&listing.UpdatedAt, &listing.RelistedFromListingID,
-		)
+		), &listing)
+		if err == nil {
+			err = tx.Commit(r.Context())
+		}
 
 	case "AUCTION":
 		if request.FixedPrice != nil {
@@ -334,10 +249,7 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Sale type is recorded here, but the listing stays in DRAFT status —
-		// creating the actual auction (starting price, increment, times, etc.) is a
-		// separate POST /api/auctions step that will publish or activate it.
-		err = DB.QueryRow(
+		err = scanListing(DB.QueryRow(
 			r.Context(),
 			`
 			UPDATE public.listings
@@ -348,11 +260,7 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 				created_at, published_at, updated_at, relisted_from_listing_id
 			`,
 			listingID, sellerID,
-		).Scan(
-			&listing.ListingID, &listing.GemID, &listing.SellerID, &listing.SaleType,
-			&listing.Status, &listing.FixedPrice, &listing.CreatedAt, &listing.PublishedAt,
-			&listing.UpdatedAt, &listing.RelistedFromListingID,
-		)
+		), &listing)
 
 	default:
 		http.Error(w, "sale_type must be FIXED_PRICE or AUCTION", http.StatusBadRequest)
@@ -369,38 +277,14 @@ func PublishListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Listing updated",
 		"listing": listing,
 	})
 }
 
-// ============================================================
-// DELETE /api/listings/{id}  (seller-owned — only while still DRAFT)
-// ============================================================
-
-// DeleteListingHandler godoc
-// @Summary Delete a draft listing
-// @Description Delete a seller-owned listing only while it is still DRAFT.
-// @Tags Listings
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Listing ID"
-// @Success 200 {object} map[string]string
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Failure 403 {string} string
-// @Failure 404 {string} string
-// @Failure 409 {string} string
-// @Router /api/listings/{id} [delete]
 func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
-	sellerID, ok := r.Context().Value(sellerIDKey).(int64)
-
-	if !ok {
-		http.Error(w, "Verified seller account required", http.StatusForbidden)
-		return
-	}
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
 
 	listingID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 
@@ -419,8 +303,7 @@ func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		if isPGError(err, "23503") {
 			http.Error(w, "Cannot delete: this listing is referenced elsewhere", http.StatusConflict)
 			return
 		}
@@ -430,16 +313,11 @@ func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if tag.RowsAffected() == 0 {
-		http.Error(
-			w,
-			"Listing not found, not owned by you, or not in DRAFT status (published listings cannot be deleted)",
-			http.StatusNotFound,
-		)
+		http.Error(w, "Listing not found, not owned by you, or not in DRAFT status (published listings cannot be deleted)", http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Listing deleted",
 	})
 }
