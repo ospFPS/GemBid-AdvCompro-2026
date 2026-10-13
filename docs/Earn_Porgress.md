@@ -1,14 +1,15 @@
 # GemBid — Earn Progress + Frontend API Guide
 
-**Date:** 5 October 2026
-**Branch:** `Earn_refactor` (from `main` @ `0ea8465`)
+**Updated:** 13 October 2026 (frontend integration on `Earn_TTB`)
+**First written:** 5 October 2026 (backend cleanup, merged to `main`)
 
-This document has two parts:
+This document has three parts:
 
-1. **Progress** — what changed in the backend this round (a cleanup, no API change).
+1. **Progress** — the backend cleanup (5 Oct).
 2. **Frontend API Guide** — everything the frontend team needs to call the backend.
+3. **Frontend Integration** (13 Oct) — William's + Ryu's frontend merged and wired to the backend, how to run the whole site.
 
-> **Frontend team:** jump to [Part 2](#part-2--frontend-api-guide).
+> **Frontend team:** start with [Part 3](#part-3--frontend-integration-13-october-2026), then use [Part 2](#part-2--frontend-api-guide) as the reference.
 
 ---
 
@@ -90,6 +91,8 @@ Static checks: `go build`, `go vet`, `gofmt` ✅
 | Interactive docs (Swagger) | `<backend>/docs` |
 
 ### ⚠️ Use a Next.js proxy — the backend does not send CORS headers
+
+> ✅ Already set up in `Frontend/next.config.js` (13 Oct). This section explains why.
 
 A browser `fetch` from `localhost:3000` straight to `:8080` **will be blocked**: the
 backend answers the CORS preflight with `405`. Proxy instead, so the browser only
@@ -246,6 +249,7 @@ and cannot be deleted while a listing references it (`409`).
 | Method | Path | Auth | Body | Response |
 |---|---|---|---|---|
 | GET | `/api/listings` | 🌐 | | `ListingItem[]` (only `PUBLISHED`/`ACTIVE`) |
+| GET | `/api/seller/listings` | 💎 | | `ListingItem[]`: **my** listings in every status, drafts included |
 | GET | `/api/listings/{id}` | 🌐 | | `Listing` |
 | POST | `/api/listings` | 💎 | `{gem_id}` | `201 {message, listing}` (status `DRAFT`) |
 | PUT | `/api/listings/{id}/publish` | 💎 owner | see below | `{message, listing}` |
@@ -257,7 +261,11 @@ Publish body:
 
 ```ts
 type ListingItem = { listing_id: number; gem_id: number; gem_name: string; gem_type: string;
-  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null };
+  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null;
+  // added 13 Oct, so a store card needs no extra calls:
+  description: string | null; seller_id: number; shop_name: string;
+  auction_id: number | null; current_price: number | null;   // auction fields are null for fixed price
+  minimum_increment: number | null; end_time: string | null };
 type Listing = { listing_id: number; gem_id: number; seller_id: number;
   sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null;
   created_at: string; published_at: string | null; updated_at: string;
@@ -274,6 +282,7 @@ auction) returns `403` with an upgrade message. Show an "Upgrade to PRO" button.
 | GET | `/api/auctions` | 🌐 | | `AuctionItem[]` (`SCHEDULED` + `ACTIVE`, active first) |
 | GET | `/api/auctions/{id}` | 🌐 | | `Auction` |
 | GET | `/api/auctions/{id}/bids` | 🌐 | | `Bid[]` (newest first) |
+| GET | `/api/me/bids` | 👤 | | `MyBid[]`: one row per auction I bid on (see below) |
 | POST | `/api/auctions` | 💎 owner | see below | `201 {message, auction}` |
 | POST | `/api/auctions/{id}/bids` | 👤 | `{bid_amount}` | `201 {message, bid, current_price, next_minimum_bid}` |
 | POST | `/api/auctions/{id}/close` | 💎 owner | | `{message, auction, order_id?}` |
@@ -301,6 +310,13 @@ Bidding rules:
 **Closing is automatic.** The backend closes ended auctions every 30 seconds. If the reserve is met, the winner gets a `PENDING_PAYMENT` order and an `AUCTION_WON` notification; otherwise the listing becomes `UNSOLD`. The `close` endpoint is only a manual shortcut.
 
 For a live view, poll `GET /api/auctions/{id}` every few seconds. There is no websocket.
+
+```ts
+type MyBid = { auction_id: number; listing_id: number; gem_name: string; gem_type: string;
+  my_highest_bid: number; my_bid_status: string; current_price: number;
+  auction_status: "SCHEDULED" | "ACTIVE" | "ENDED"; end_time: string;
+  is_leading: boolean; is_winner: boolean; last_bid_time: string };
+```
 
 ```ts
 type Auction = { auction_id: number; listing_id: number; starting_price: number;
@@ -485,10 +501,83 @@ type ListingStatus = "DRAFT" | "PUBLISHED" | "ACTIVE" | "SOLD" | "UNSOLD" | "EXP
 
 | Gap | Workaround for now |
 |---|---|
-| No "my listings" endpoint for sellers; `GET /api/listings` only shows published or active ones | Keep the `listing_id` from create/publish responses |
 | `GET /api/gems` returns every seller's gems | Filter by `seller_id` on the frontend |
 | `GET /api/listings/{id}` also returns `DRAFT` listings to anyone | Don't link to drafts publicly |
 | No search, filters or pagination on lists | Filter on the frontend (lists are small) |
 | No image upload | Placeholder images |
-| No CORS | Use the Next.js proxy (section 2.1) |
+| No CORS | Next.js proxy, already in `next.config.js` |
+| Orders don't include the gem name | Look up `/api/listings/{id}` → `/api/gems/{gem_id}` (done by `gemForListing` in `app/lib/api.js`) |
+| No buyer name on seller orders | Show `Buyer #id` |
+| No seller analytics, no edit-listing endpoint | Those pages stay on mock data |
 | No refresh token (24h expiry) | Re-login on `401` |
+
+---
+
+# Part 3 — Frontend Integration (13 October 2026)
+
+## 3.1 What happened
+
+- **Branches:** William's `william-frontend` already contains all of Ryu's `Frontend-Frien` work, so merging it brought in both. `Earn_TTB` was first brought up to date with `main`, then the frontend merged with no conflicts.
+- **Before:** the frontend was a UI prototype (20 pages, hard-coded data, login did nothing, no API calls).
+- **Now:** the core demo flows run on the real backend. Page markup and CSS were kept; only the data and the button handlers changed.
+
+| Page | Status | Backend calls |
+|---|---|---|
+| Login / Sign up | ✅ live (username login) | `POST /api/login`, `POST /api/register` |
+| Store, Item, Cart | ✅ live (real listings, baht prices) | `GET /api/listings` |
+| Buy now / Cart checkout | ✅ live → goes to the order page | `POST /api/listings/{id}/buy` |
+| Bid | ✅ live (auto-refresh every 5s) | `GET /api/auctions/{id}`, `POST /api/auctions/{id}/bids` |
+| My Purchases, Order details | ✅ live (pay, cancel, confirm delivery, tracking) | `/api/orders...` |
+| Notifications | ✅ live (mark read / all read, links) | `/api/notifications...` |
+| Profile | ✅ live (edit, change password, PRO upgrade, log out) | `/api/me`, `/api/subscriptions/...` |
+| Become a Seller | ✅ live (shows status after applying) | `/api/seller/status`, `/api/seller/apply` |
+| Create Listing | ✅ live (fixed price or auction with duration) | gems → listings → publish / auctions |
+| Seller Orders | ✅ live (mark as shipped) | `/api/orders?as=seller`, `PUT /api/orders/{id}/ship` |
+| My Listings, View listing | ✅ live | `GET /api/seller/listings` (new) |
+| My Bids | ✅ live | `GET /api/me/bids` (new) |
+| Seller Analytics, My Auctions, Edit listing, Home | ⬜ still mock | no matching backend endpoints yet |
+
+**Shared code:**
+- `app/lib/api.js`: the browser API helper (adds the token, plain-text errors, redirects to `/login` on 401), plus `formatTHB`, `gemImage`, `toPurchase` and `toMyListing`.
+- `app/lib/server.js`: `serverApi()` for server components. It renders per request, never at build time.
+- `app/AccountNav.js`: the store header (shows seller links once the seller is verified).
+
+**Images:** the backend has no image upload, so pages show a photo matched to the gem type (Sapphire, Ruby, Emerald, Diamond, Amethyst, Pearl) from `public/assets`.
+
+**Fixed along the way:** `become-seller` failed `next build` (`useSearchParams` needs a `<Suspense>` boundary). `npm run dev` doesn't catch this, so run `npm run build` before pushing.
+
+## 3.2 Running the whole site
+
+```bash
+# on the server (or any machine with Docker), in the repo root with .env present
+docker compose up -d --build
+```
+
+| Service | URL |
+|---|---|
+| Website | `http://thalamus:3000` |
+| Backend API | `http://thalamus:8080` (Swagger at `/docs`) |
+
+The frontend container proxies `/api/*` to the backend container (`BACKEND_URL=http://backend:8080`, set in `docker-compose.yml`).
+
+**Local frontend development** against the team server:
+
+```bash
+cd Frontend
+BACKEND_URL=http://thalamus:8080 npm run dev
+```
+
+> The server disk is small (11 GB). After a rebuild, run `docker builder prune -af` to free the build cache. A full disk made one deploy fail on 13 Oct.
+
+## 3.3 Verification (13 Oct)
+
+- All 8 backend integration tests pass, plus new checks for `GET /api/seller/listings`, `GET /api/me/bids` and the new listing fields.
+- `next build` passes.
+- On thalamus, every page returns 200 on `:3000`. Unknown items return 404, and `/api` is proxied.
+- A full demo run through the site's `/api` proxy passed, checking every step:
+  - A seller applies and an admin approves.
+  - The seller creates 3 fixed-price listings and 2 auctions.
+  - A buyer does Buy Now → pay → the seller ships → the buyer confirms delivery.
+  - Two users bid: a too-low bid gets 409, a seller self-bid gets 403, and the outbid notification is sent.
+  - Notifications arrive for both sides.
+- The rendered store and item pages show the real gems, shop name, baht prices and photos.
