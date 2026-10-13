@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 const bids = [
     {
         id: 1,
@@ -116,9 +117,16 @@ export default function MyBids() {
                         <p>
                             <strong>Auction ends:</strong> {bid.auctionEnds}
                         </p>
-                        <button type="button">
+                        <Link
+                            href={
+                            bid.status === "Won"
+                                ? `/my-purchases`
+                                : `/store`
+                            }
+                            className="bid-action-button"
+                        >
                             {bid.status === "Won" ? "View Purchase" : "View Auction"}
-                        </button>
+                        </Link>
                     </section>
                 ))}
             </div>
