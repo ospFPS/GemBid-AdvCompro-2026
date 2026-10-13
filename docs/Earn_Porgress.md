@@ -598,14 +598,17 @@ BACKEND_URL=http://thalamus:8080 npm run dev
 
 ## 3.5 Testing the site
 
-**Demo accounts** (one shared password; ask Earn, it's not stored in the repo):
+**Demo accounts** (reset 14 Oct by `backend/db/seed_demo.py`; one shared password, ask Earn, it's not stored in the repo):
 
-| Username | Role | Good for |
+| Username | Role | Data |
 |---|---|---|
-| `demo_seller` | Verified seller ("Siam Gem House") | Create listings, seller orders, shipping, my listings |
-| `demo_buyer` | Buyer (one delivered order) | Buying, paying, order tracking, notifications |
-| `demo_bidder` | Buyer (leads the ruby auction) | Bidding against `demo_buyer` |
-| `demo_admin` | Admin | Seller approvals and reports, via Swagger |
+| `admin` | Admin | Uses the `/admin` dashboard |
+| `siam_gems` | Seller "Siam Gem House" (PRO) | 9 listings incl. live auctions, a draft, sold items; orders to ship |
+| `chanthaburi_jewels` | Seller "Chanthaburi Jewels" (FREE, at the 5-listing limit) | Fixed-price items, one auction with bids, one unpaid order |
+| `lanna_stones` | Seller application **pending** | Approve it in `/admin` |
+| `alice` | Buyer | Delivered order, won the Blue Topaz auction (order to pay), leads the ruby auction, reported a listing |
+| `bob` | Buyer | Shipped order (confirm delivery), unpaid order, outbid on the ruby |
+| `chai` | Buyer | Paid order waiting for shipping, outbid on the emerald |
 
 **Test scenarios:**
 
@@ -615,19 +618,52 @@ BACKEND_URL=http://thalamus:8080 npm run dev
 4. **Become a seller:** sign up → **Become a Seller** → an admin approves it in Swagger (below) → the seller links appear in the header.
 5. **Profile:** edit details, change password (needs the current one), log out.
 
-**Admin actions:** the website has no admin pages, so use Swagger:
-1. Open `http://thalamus:8080/docs`.
-2. Call `POST /api/login` as `demo_admin` and copy the `token`.
-3. Click **Authorize** and enter `Bearer <token>`.
-4. The admin endpoints are listed in section 2.4.
-
-Any account can be made an admin with this SQL:
+**Admin actions:** log in as `admin` → **Admin Dashboard** in the store header (`/admin`). Swagger (`http://thalamus:8080/docs`) still works for anything else. Any account can be made an admin with this SQL:
 `UPDATE users SET role = 'ADMIN' WHERE username = '...';`
 
 **Expected gaps (not bugs):**
 - Seller Analytics, My Auctions, Edit Listing and Home still show mock data.
 - Photos are chosen by gem type, since there's no image upload yet.
-- There is no admin UI.
 - Seller orders show buyers as "Buyer #id".
 
 **Not merged to `main` yet:** more team code is coming. It will be merged into `Earn_TTB` and tested the same way before anything goes to `main`.
+
+## 3.6 Second integration (14 October 2026)
+
+`FrontendForRealThisTime` (contains all of William's and Frien's work, including Frien's new admin dashboard and the store's Buy now / Bid filter) was merged into `Earn_TTB`.
+
+**Problems found and how they were handled:**
+
+| Problem | Fix |
+|---|---|
+| Admin dashboard only edited a browser-local copy of listings (`localStorage`), not the database | Rewired to the backend; layout and styles kept |
+| Admin dashboard imported `listings.js` (server-only now), so it would break `next build` | Uses the browser API helper instead |
+| No access check; "Admin dashboard" link shown to everyone | Page checks `role = ADMIN`; the link only appears for admins (backend enforces it too) |
+| Empty `app/api/admin-api/[...path]/route.js` could intercept the `/api` proxy | Deleted (it was empty) |
+| `store`, `item`, `listings.js`, `.gitignore` conflicted with the live-data wiring | Merged: their new filter and item layout on top of live data and baht prices |
+
+**Admin dashboard (`/admin`, admin only):**
+- Platform stats: users, live listings, pending sellers, paid orders, sales and PRO members.
+- Seller applications: approve or reject.
+- All listings: search, type, status and sort filters, plus **Suspend**, which stops a running auction and notifies the seller.
+- Pending reports: resolve with an action (warn user, suspend listing, suspend seller) or reject.
+
+**New backend endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/admin/listings` 🛡️ | Every listing in every status |
+| `PUT /api/admin/listings/{id}/suspend` 🛡️ | Suspends the listing, records a moderation action and notifies the seller. Shares the suspend logic with report review |
+
+**Database reset:** all data was wiped (schema kept, IDs restart at 1) and reseeded with `backend/db/seed_demo.py`. To reset again on the server:
+
+```bash
+cd /srv/Adv_Compro_Project/GemBid-AdvCompro-2026
+set -a; . ./.env; set +a
+python3 backend/db/seed_demo.py --wipe   # DELETES ALL DATA, then reseeds (~3 min)
+```
+
+**Still not covered by the frontend:**
+- Seller Analytics, My Auctions and Edit Listing / Relist still show mock data.
+- There's no "Report" button for users (reports can only be created through the API).
+- There are no admin user-management or bid-history pages.
