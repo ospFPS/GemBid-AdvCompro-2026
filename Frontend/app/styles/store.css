@@ -488,8 +488,43 @@
   list-style: none;
 }
 
+.store-left-nav > h2 {
+  margin: 1rem 0 0.75rem;
+  padding: 0 0.75rem;
+  font-size: 1rem;
+}
+
 .store-left-nav li+li {
   margin-top: 0.75rem;
+}
+
+.listing-type-filter a {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #222222;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.listing-type-filter a:hover {
+  background: #111111;
+  color: #ffffff;
+}
+
+.listing-type-filter a:focus-visible {
+  outline: 3px solid #777777;
+  outline-offset: 3px;
+}
+
+.listing-type-filter a[aria-current="page"] {
+  background: #111111;
+  color: #ffffff;
 }
 
 /* The price min-max adjustor */
