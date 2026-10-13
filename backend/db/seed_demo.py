@@ -8,6 +8,7 @@ Run on the server, from the repo root, with the backend running:
 
     set -a; . ./.env; set +a
     python3 backend/db/seed_demo.py --wipe            # API at http://localhost:8080
+    python3 backend/db/seed_demo.py --wipe --minimal  # only admin + 1 seller + 2 fixed-price + 2 auctions
 
 Needs: python3, psql, DATABASE_URL in the environment.
 All demo accounts use the password in DEMO_PASSWORD.
@@ -73,6 +74,9 @@ def main():
     admin = account("admin", "GemBid Admin", "admin@gembid.test")
     sql("UPDATE public.users SET role = 'ADMIN' WHERE username = 'admin'")
     siam = account("siam_gems", "Somchai Rattanakul", "somchai@siamgems.test")
+    if "--minimal" in sys.argv:
+        minimal(admin, siam)
+        return
     chan = account("chanthaburi_jewels", "Malee Srisuk", "malee@chanjewels.test")
     lanna = account("lanna_stones", "Arthit Kaewmanee", "arthit@lannastones.test")
     alice = account("alice", "Alice Wong", "alice@example.test")
@@ -178,6 +182,32 @@ def main():
     stats = call("GET", "/api/admin/analytics", admin, want=200)
     print("Done:", json.dumps({k: stats[k] for k in ("listings_by_status", "auctions_by_status", "orders_by_status")}))
     print(f"All accounts use the password {DEMO_PASSWORD!r}.")
+
+
+def minimal(admin, seller):
+    """Admin + one approved seller with 2 fixed-price listings and 2 auctions (no bids or orders)."""
+    call("POST", "/api/seller/apply", seller, {"shop_name": "Siam Gem House", "legal_name": "Siam Gem House Co., Ltd.",
+         "seller_type": "Business", "address": "88 Silom Rd, Bang Rak, Bangkok",
+         "description": "Siam Gem House: certified natural gemstones."}, want=201)
+    app = call("GET", "/api/admin/seller-applications", admin, want=200)["applications"][0]
+    call("PUT", f"/api/admin/seller-applications/{app['seller_id']}", admin, {"decision": "APPROVE"}, want=200)
+
+    now = datetime.now(timezone.utc)
+    for name, gem_type, desc, carat, price, auction in [
+        ("Royal Blue Sapphire", "Sapphire", "Kanchanaburi blue sapphire, heated, oval cut.", 2.1, 12500, None),
+        ("Diamond Solitaire Ring", "Diamond", "VS1 round brilliant set in 18k white gold.", 0.8, 45000, None),
+        ("Pigeon Blood Ruby", "Ruby", "Burmese ruby, unheated, with lab report.", 1.5, None, (5000, 250, 6000)),
+        ("Colombian Emerald", "Emerald", "Muzo emerald, minor oil, with certificate.", 2.0, None, (7000, 500, None)),
+    ]:
+        gem = call("POST", "/api/gems", seller, {"gem_name": name, "gem_type": gem_type, "description": desc, "carat": carat}, want=201)["gem"]
+        lid = call("POST", "/api/listings", seller, {"gem_id": gem["gem_id"]}, want=201)["listing"]["listing_id"]
+        if price:
+            call("PUT", f"/api/listings/{lid}/publish", seller, {"sale_type": "FIXED_PRICE", "fixed_price": price}, want=200)
+        else:
+            call("PUT", f"/api/listings/{lid}/publish", seller, {"sale_type": "AUCTION"}, want=200)
+            call("POST", "/api/auctions", seller, {"listing_id": lid, "starting_price": auction[0], "minimum_increment": auction[1],
+                 "reserve_price": auction[2], "start_time": now.isoformat(), "end_time": (now + timedelta(days=7)).isoformat()}, want=201)
+    print(f"Done: admin + siam_gems, 2 fixed-price listings, 2 auctions (7 days). Password {DEMO_PASSWORD!r}.")
 
 
 if __name__ == "__main__":
