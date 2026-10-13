@@ -1,0 +1,18 @@
+/* :root {
+  background: #b984b5;
+} */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-top: 0;
+  text-align: center;
+}
