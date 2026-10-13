@@ -92,6 +92,8 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	mux.HandleFunc("GET /api/subscriptions/me", AuthMiddleware(MySubscriptionHandler))
 	mux.HandleFunc("POST /api/subscriptions/upgrade", AuthMiddleware(UpgradeSubscriptionHandler))
 	mux.HandleFunc("GET /api/admin/analytics", AuthMiddleware(AdminMiddleware(AdminAnalyticsHandler)))
+	mux.HandleFunc("GET /api/admin/listings", AuthMiddleware(AdminMiddleware(AdminListingsHandler)))
+	mux.HandleFunc("PUT /api/admin/listings/{id}/suspend", AuthMiddleware(AdminMiddleware(AdminSuspendListingHandler)))
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
@@ -241,6 +243,16 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 			t.Fatalf("analytics missing %q: %v", key, report)
 		}
 	}
+
+	// --- Admin listing moderation ---
+	suspendPath := fmt.Sprintf("/api/admin/listings/%d/suspend", listingB)
+	call("PUT", suspendPath, buyer, nil, http.StatusForbidden)
+	call("PUT", suspendPath, admin, nil, http.StatusOK)
+	call("PUT", suspendPath, admin, nil, http.StatusConflict)
+	if item := findListing(call("GET", "/api/admin/listings", admin, nil, http.StatusOK), listingB); item == nil || item.Status != "SUSPENDED" {
+		t.Fatalf("admin listings should show %d as SUSPENDED: %+v", listingB, item)
+	}
+	_, _ = DB.Exec(ctx, `DELETE FROM public.moderation_actions WHERE listing_id = $1`, listingB)
 
 	t.Logf("PASS order=%d delivered, order=%d cancelled, buyer=%d PRO", order.OrderID, orderB.OrderID, buyerID)
 }

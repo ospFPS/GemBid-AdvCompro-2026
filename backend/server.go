@@ -104,6 +104,8 @@ func Run() {
 	mux.HandleFunc("GET /api/admin/reports", AuthMiddleware(AdminMiddleware(AdminListReportsHandler)))
 	mux.HandleFunc("PUT /api/admin/reports/{id}", AuthMiddleware(AdminMiddleware(AdminReviewReportHandler)))
 	mux.HandleFunc("GET /api/admin/moderation-actions", AuthMiddleware(AdminMiddleware(AdminListModerationActionsHandler)))
+	mux.HandleFunc("GET /api/admin/listings", AuthMiddleware(AdminMiddleware(AdminListingsHandler)))
+	mux.HandleFunc("PUT /api/admin/listings/{id}/suspend", AuthMiddleware(AdminMiddleware(AdminSuspendListingHandler)))
 
 	StartAuctionCloser()
 	StartEmailWorker()
