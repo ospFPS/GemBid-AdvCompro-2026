@@ -1,8 +1,8 @@
 .admin-page {
-  width: min(100% - 2rem, 76rem);
+  width: min(100% - 2rem, 80rem);
   margin: 0 auto;
   padding: 2rem 0 4rem;
-  color: #17131f;
+  color: #111111;
 }
 
 .admin-header,
@@ -32,7 +32,9 @@
 
 .admin-header h1 {
   margin: 0;
-  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  color: #17131f;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  letter-spacing: -0.035em;
   text-align: left;
 }
 
@@ -46,9 +48,13 @@
   color: #4b278e;
   font-weight: 600;
   text-decoration: none;
+  transition: color 160ms ease;
 }
 
-.admin-back-link:hover,
+.admin-back-link:hover {
+  color: #5e35a5;
+}
+
 .admin-text-button:hover {
   text-decoration: underline;
 }
@@ -73,9 +79,10 @@
 .admin-stat,
 .admin-listings,
 .admin-form {
-  border: 1px solid #e4e1e8;
-  border-radius: 0.65rem;
+  border: 1px solid #e2e5e9;
+  border-radius: 1rem;
   background: #ffffff;
+  box-shadow: 0 0.25rem 1rem rgb(17 24 39 / 5%);
 }
 
 .admin-stat {
@@ -85,11 +92,12 @@
 }
 
 .admin-stat span {
-  color: #66616f;
+  color: #555555;
   font-size: 0.85rem;
 }
 
 .admin-stat strong {
+  color: #211634;
   font-size: 1.65rem;
 }
 
@@ -115,31 +123,39 @@
 
 .admin-button {
   min-height: 2.5rem;
-  padding: 0.55rem 0.9rem;
-  border: 1px solid #5e35a5;
-  border-radius: 0.45rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid #222222;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
   font: inherit;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .admin-button--primary {
   background: #5e35a5;
+  border-color: #5e35a5;
   color: #ffffff;
 }
 
 .admin-button--primary:hover {
   background: #4b278e;
+  border-color: #4b278e;
+  transform: translateY(-1px);
 }
 
 .admin-button--secondary {
   background: #ffffff;
-  color: #4b278e;
+  color: #111111;
 }
 
 .admin-button--secondary:hover {
-  background: #f6f3fb;
+  background: #111111;
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .admin-button:focus-visible,
@@ -149,8 +165,12 @@
 .admin-filters select:focus-visible,
 .admin-form input:focus-visible,
 .admin-form textarea:focus-visible {
-  outline: 2px solid #5e35a5;
-  outline-offset: 2px;
+  outline: 3px solid #9c7bd1;
+  outline-offset: 3px;
+}
+
+.admin-back-link:focus-visible {
+  border-radius: 0.2rem;
 }
 
 .admin-file-input {
@@ -160,7 +180,7 @@
 .admin-form {
   margin: 0 0 1.25rem;
   padding: 1.25rem;
-  background: #faf9fc;
+  background: #faf8fd;
 }
 
 .admin-form-heading {
@@ -178,7 +198,7 @@
 .admin-filters label {
   display: grid;
   gap: 0.4rem;
-  color: #403b48;
+  color: #111111;
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -191,10 +211,10 @@
   min-width: 0;
   min-height: 2.5rem;
   padding: 0.55rem 0.65rem;
-  border: 1px solid #d4d0da;
-  border-radius: 0.4rem;
+  border: 1px solid #b8b8b8;
+  border-radius: 0.35rem;
   background: #ffffff;
-  color: #17131f;
+  color: #111111;
   font: inherit;
   font-size: 0.9rem;
 }
@@ -245,7 +265,7 @@
 
 .admin-empty-state {
   padding: 1.5rem 0;
-  color: #66616f;
+  color: #555555;
   text-align: center;
 }
 
@@ -262,12 +282,12 @@
 .admin-table th,
 .admin-table td {
   padding: 0.8rem 0.65rem;
-  border-top: 1px solid #ece9ef;
+  border-top: 1px solid #e5e5e5;
   vertical-align: middle;
 }
 
 .admin-table th {
-  color: #66616f;
+  color: #555555;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -277,6 +297,14 @@
 
 .admin-table td {
   font-size: 0.9rem;
+}
+
+.admin-table tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.admin-table tbody tr:hover {
+  background: #faf8fd;
 }
 
 .admin-listing-cell {
@@ -290,8 +318,8 @@
   width: 2.75rem;
   height: 2.75rem;
   flex: 0 0 auto;
-  border: 1px solid #e4e1e8;
-  border-radius: 0.4rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 0.5rem;
   background: #ffffff;
   object-fit: cover;
 }
@@ -309,7 +337,7 @@
 }
 
 .admin-listing-cell span {
-  color: #66616f;
+  color: #555555;
   font-size: 0.8rem;
 }
 
@@ -325,8 +353,8 @@
 }
 
 .admin-status--hidden {
-  background: #f1eff3;
-  color: #625d68;
+  background: #f5f5f5;
+  color: #555555;
 }
 
 .admin-row-actions {
@@ -338,7 +366,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #4b278e;
+  color: #5e35a5;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
