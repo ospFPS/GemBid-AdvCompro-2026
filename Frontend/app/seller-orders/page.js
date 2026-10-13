@@ -1,51 +1,42 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api, toPurchase } from "../lib/api";
 
-const sampleOrders = [
-    {
-        id: 1,
-        gemstone: "Emerald Earrings",
-        image: "/assets/my-bids/Emerald earrings.webp",
-        buyer: "Alex Johnson",
-        orderDate: "10 October 2026",
-        total: 3500,
-        paymentStatus: "Paid",
-        status: "Processing",
-        shippingCarrier: "",
-        trackingNumber: "",
-    },
-    {
-        id: 2,
-        gemstone: "Ruby Necklace",
-        image: "/assets/my-bids/Ruby necklace.jpg",
-        buyer: "Emily Chen",
-        orderDate: "9 October 2026",
-        total: 8500,
-        paymentStatus: "Paid",
-        status: "Shipped",
-        shippingCarrier: "DHL",
-        trackingNumber: "DHL123456",
-    },
-    {
-        id: 3,
-        gemstone: "Blue Sapphire",
-        image: "/assets/my-bids/Blue sapphire.webp",
-        buyer: "Daniel Smith",
-        orderDate: "8 October 2026",
-        total: 6200,
-        paymentStatus: "Pending",
-        status: "Processing",
-        shippingCarrier: "",
-        trackingNumber: "",
-    },
-];
+const filters = ["All", "Awaiting Payment", "Processing", "Shipped", "Delivered"];
 
-const filters = ["All", "Processing", "Shipped", "Delivered"];
+const PAYMENT_LABELS = { PENDING_PAYMENT: "Pending", CANCELLED: "Cancelled" };
+
+// Seller order + gem + shipping, in the shape this page renders.
+async function toSellerOrder(order) {
+    const [purchase, detail] = await Promise.all([toPurchase(order), api(`/api/orders/${order.order_id}`)]);
+    return {
+        id: order.order_id,
+        gemstone: purchase.gemstone,
+        image: purchase.image,
+        buyer: `Buyer #${order.buyer_id}`,
+        orderDate: purchase.purchaseDate,
+        total: order.total_amount,
+        paymentStatus: PAYMENT_LABELS[order.status] ?? "Paid",
+        status: purchase.status,
+        rawStatus: order.status,
+        shippingAddress: detail.shipping?.shipping_address ?? "",
+        shippingCarrier: detail.shipping?.courier ?? "",
+        trackingNumber: detail.shipping?.tracking_number ?? "",
+    };
+}
 
 export default function Orders() {
-    const [orders, setOrders] = useState(sampleOrders);
+    const [orders, setOrders] = useState([]);
     const [selectedFilter, setSelectedFilter] = useState("All");
     const [messages, setMessages] = useState({});
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        api("/api/orders?as=seller")
+            .then((list) => Promise.all(list.map(toSellerOrder)))
+            .then(setOrders)
+            .catch((err) => setError(err.message));
+    }, []);
 
     const filteredOrders =
         selectedFilter === "All"
@@ -62,26 +53,30 @@ export default function Orders() {
         );
     }
 
-    function saveShipping(orderId) {
+    async function saveShipping(orderId) {
         const order = orders.find((item) => item.id === orderId);
+        const say = (text) => setMessages((current) => ({ ...current, [orderId]: text }));
 
         if (!order.shippingCarrier.trim() || !order.trackingNumber.trim()) {
-            setMessages((current) => ({
-                ...current,
-                [orderId]: "Please enter both the carrier and tracking number.",
-            }));
+            say("Please enter both the carrier and tracking number.");
             return;
         }
-
-        setMessages((current) => ({
-            ...current,
-            [orderId]: "Shipping information saved for this demo.",
-        }));
+        try {
+            await api(`/api/orders/${orderId}/ship`, {
+                method: "PUT",
+                body: { courier: order.shippingCarrier, tracking_number: order.trackingNumber },
+            });
+            updateOrder(orderId, "status", "Shipped");
+            updateOrder(orderId, "rawStatus", "SHIPPED");
+            say("Marked as shipped. The buyer has been notified.");
+        } catch (err) {
+            say(err.message);
+        }
     }
 
     return (
         <main className="orders-page">
-            <a href="/" className="seller-orders-home">
+            <a href="/store" className="seller-orders-home">
                 <button type="button">Home</button>
             </a>
             <div>
@@ -94,6 +89,7 @@ export default function Orders() {
                 <p>View customer orders and manage shipping information.</p>
             </div>
 
+            {error && <p role="alert">{error}</p>}
             <div className="orders-filters">
                 {filters.map((filter) => (
                     <button
@@ -139,28 +135,14 @@ export default function Orders() {
                                         </span>
                                     </p>
 
-                                    <label htmlFor={`status-${order.id}`}>
-                                        Order Status
-                                    </label>
-                                    <select
-                                        id={`status-${order.id}`}
-                                        value={order.status}
-                                        onChange={(event) =>
-                                            updateOrder(
-                                                order.id,
-                                                "status",
-                                                event.target.value
-                                            )
-                                        }
-                                    >
-                                        <option value="Processing">
-                                            Processing
-                                        </option>
-                                        <option value="Shipped">Shipped</option>
-                                        <option value="Delivered">
-                                            Delivered
-                                        </option>
-                                    </select>
+                                    <p>
+                                        <strong>Order Status:</strong> {order.status}
+                                    </p>
+                                    {order.shippingAddress && (
+                                        <p>
+                                            <strong>Ship to:</strong> {order.shippingAddress}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -174,6 +156,7 @@ export default function Orders() {
                                     id={`carrier-${order.id}`}
                                     type="text"
                                     placeholder="e.g. DHL, FedEx"
+                                    disabled={order.rawStatus !== "PAID"}
                                     value={order.shippingCarrier}
                                     onChange={(event) =>
                                         updateOrder(
@@ -191,6 +174,7 @@ export default function Orders() {
                                     id={`tracking-${order.id}`}
                                     type="text"
                                     placeholder="Enter tracking number"
+                                    disabled={order.rawStatus !== "PAID"}
                                     value={order.trackingNumber}
                                     onChange={(event) =>
                                         updateOrder(
@@ -204,8 +188,11 @@ export default function Orders() {
                                 <button
                                     type="button"
                                     onClick={() => saveShipping(order.id)}
+                                    disabled={order.rawStatus !== "PAID"}
                                 >
-                                    Save Shipping Information
+                                    {order.rawStatus === "PENDING_PAYMENT"
+                                        ? "Waiting for buyer payment"
+                                        : "Mark as Shipped"}
                                 </button>
 
                                 {messages[order.id] && (

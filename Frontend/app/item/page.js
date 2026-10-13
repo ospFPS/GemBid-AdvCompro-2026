@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getListingById, getMoreListings } from "../listings";
 import AddToCartButton from "../cart/AddToCartButton";
 import BuyNowButton from "../cart/BuyNowButton";
+import { formatTHB } from "../lib/api";
 
 export default async function ItemPage({ searchParams }) {
 	const { id } = await searchParams;
@@ -42,10 +43,7 @@ export default async function ItemPage({ searchParams }) {
 							</div>
 						</div>
 						<p className="item-detail-price">
-							{new Intl.NumberFormat("en-US", {
-								style: "currency",
-								currency: "USD",
-							}).format(item.price)}
+							{formatTHB(item.price)}
 						</p>
 						{/* button for bid or buy */}
 						<div className="item-detail-actions">
@@ -90,10 +88,7 @@ export default async function ItemPage({ searchParams }) {
 									<span>Sold by {moreItem.seller}</span>
 								</div>
 								<p className="store-item-price">
-									{new Intl.NumberFormat("en-US", {
-										style: "currency",
-										currency: "USD",
-									}).format(moreItem.price)}
+									{formatTHB(moreItem.price)}
 								</p>
 							</article>
 						</Link>

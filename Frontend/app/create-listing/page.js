@@ -2,6 +2,16 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "../lib/api";
+
+const AUCTION_DURATIONS = [
+    { label: "5 minutes (demo)", minutes: 5 },
+    { label: "1 hour", minutes: 60 },
+    { label: "1 day", minutes: 60 * 24 },
+    { label: "3 days", minutes: 60 * 24 * 3 },
+    { label: "7 days", minutes: 60 * 24 * 7 },
+];
+
 export default function CreateListing() {
     const [gemstoneName, setGemstoneName] = useState("");
     const [gemstoneType, setGemstoneType] = useState("Sapphire");
@@ -13,13 +23,69 @@ export default function CreateListing() {
     const [images, setImages] = useState([]);
     const [certificate, setCertificate] = useState(null);
     const [message, setMessage] = useState("");
+    const [durationMinutes, setDurationMinutes] = useState(60 * 24);
+    const [busy, setBusy] = useState(false);
+
+    // Gem -> DRAFT listing. Images and certificates are not uploaded yet (no backend support).
+    async function createDraft() {
+        const gem = (await api("/api/gems", {
+            method: "POST",
+            body: { gem_name: gemstoneName, gem_type: gemstoneType, description },
+        })).gem;
+        return (await api("/api/listings", { method: "POST", body: { gem_id: gem.gem_id } })).listing;
+    }
+
+    async function run(task) {
+        setBusy(true);
+        setMessage("");
+        try {
+            await task();
+        } catch (err) {
+            setMessage(err.message);
+        }
+        setBusy(false);
+    }
 
     function handleSaveDraft() {
-        setMessage("Draft saved for demonstration. It has not been stored permanently.");
+        if (!gemstoneName.trim()) {
+            setMessage("Listing name is required.");
+            return;
+        }
+        run(async () => {
+            const listing = await createDraft();
+            setMessage(`Draft saved (listing #${listing.listing_id}).`);
+        });
     }
+
     function handlePublish(event) {
         event.preventDefault();
-        setMessage("Listing form completed for demonstration. Backend publishing is not connected yet.");
+        run(async () => {
+            const listing = await createDraft();
+            if (saleMethod === "Fixed Price") {
+                await api(`/api/listings/${listing.listing_id}/publish`, {
+                    method: "PUT",
+                    body: { sale_type: "FIXED_PRICE", fixed_price: Number(price) },
+                });
+            } else {
+                await api(`/api/listings/${listing.listing_id}/publish`, {
+                    method: "PUT",
+                    body: { sale_type: "AUCTION" },
+                });
+                const start = new Date();
+                await api("/api/auctions", {
+                    method: "POST",
+                    body: {
+                        listing_id: listing.listing_id,
+                        starting_price: Number(price),
+                        minimum_increment: Number(minimumIncrement),
+                        reserve_price: reservePrice ? Number(reservePrice) : null,
+                        start_time: start.toISOString(),
+                        end_time: new Date(start.getTime() + durationMinutes * 60000).toISOString(),
+                    },
+                });
+            }
+            window.location.href = `/item?id=${listing.listing_id}`;
+        });
     }
 
     return (
@@ -72,7 +138,7 @@ export default function CreateListing() {
                     </div>
                 </section>
                 <section className="listing-form-section">
-                    <h2>Gemstone Images </h2>
+                    <h2>Gemstone Images (preview only, not uploaded yet)</h2>
                     <div className="listing-form-group">
                         <label htmlFor="images">Upload Images</label>
                         <input
@@ -149,6 +215,18 @@ export default function CreateListing() {
                                 />
                             </div>
                             <div className="listing-form-group">
+                                <label htmlFor="duration">Auction Duration (starts now)</label>
+                                <select
+                                    id="duration"
+                                    value={durationMinutes}
+                                    onChange={(event) => setDurationMinutes(Number(event.target.value))}
+                                >
+                                    {AUCTION_DURATIONS.map((d) => (
+                                        <option key={d.minutes} value={d.minutes}>{d.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="listing-form-group">
                                 <label htmlFor="reservePrice">Reserve Price (THB, Optional)</label>
                                 <input
                                     id="reservePrice"
@@ -169,11 +247,11 @@ export default function CreateListing() {
                     </p>
                 )}
                 <div className="create-listing-actions">
-                    <button type="button" className="save-draft-button" onClick={handleSaveDraft}>
+                    <button type="button" className="save-draft-button" onClick={handleSaveDraft} disabled={busy}>
                         Save Draft
                     </button>
-                    <button type="submit" className="publish-listing-button">
-                        Publish Listing
+                    <button type="submit" className="publish-listing-button" disabled={busy}>
+                        {busy ? "Publishing..." : "Publish Listing"}
                     </button>
                 </div>
             </form>

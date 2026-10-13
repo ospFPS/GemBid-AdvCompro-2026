@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { addCartItem } from "./cartStorage";
+import { api } from "../lib/api";
 
+// Creates a real order for this listing, then opens the order page to pay.
 export default function BuyNowButton({ itemId }) {
-	const router = useRouter();
 	const [message, setMessage] = useState("");
+	const [busy, setBusy] = useState(false);
 
-	function handleBuyNow() {
+	async function handleBuyNow() {
+		setBusy(true);
 		try {
-			addCartItem(itemId);
-			router.push("/cart");
+			const order = await api(`/api/listings/${itemId}/buy`, { method: "POST" });
+			window.location.href = `/my-purchases/view-order/${order.order_id}`;
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "Unable to update the cart.");
+			setMessage(error.message);
+			setBusy(false);
 		}
 	}
 
@@ -23,8 +25,9 @@ export default function BuyNowButton({ itemId }) {
 				className="item-action-button item-action-button--primary"
 				type="button"
 				onClick={handleBuyNow}
+				disabled={busy}
 			>
-				Buy now
+				{busy ? "Placing order..." : "Buy now"}
 			</button>
 			{message && <span role="alert">{message}</span>}
 		</>

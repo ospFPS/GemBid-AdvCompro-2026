@@ -1,19 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getListingById } from "../listings";
+import { formatTHB } from "../lib/api";
+import BidForm from "./BidForm";
 
 function formatPrice(price) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(price);
+	return formatTHB(price);
 }
 
 export default async function BidPage({ searchParams }) {
 	const { itemId } = await searchParams;
 	const item = await getListingById(itemId);
 
-	if (!item || !item.isBid) {
+	if (!item || !item.isBid || !item.auctionId) {
 		notFound();
 	}
 
@@ -33,7 +32,7 @@ export default async function BidPage({ searchParams }) {
 						<h2 id="bid-listing-heading">{item.title}</h2>
 						<p>{item.description}</p>
 						<p className="bid-listing-price">
-							<span>Current starting price</span>
+							<span>Current price</span>
 							<strong>{formatPrice(item.price)}</strong>
 						</p>
 						<div className="listing-seller">
@@ -45,25 +44,7 @@ export default async function BidPage({ searchParams }) {
 
 				<aside className="bid-summary" aria-labelledby="bid-summary-heading">
 					<h2 id="bid-summary-heading">Your bid</h2>
-					<p>
-						Bidding is not implemented yet. Hopefully done next week :3
-					</p>
-					<label htmlFor="bid-amount">Bid amount</label>
-					<div className="bid-amount-field">
-						<span aria-hidden="true">$</span>
-						<input
-							id="bid-amount"
-							name="bid-amount"
-							type="number"
-							min={item.price}
-							step="0.01"
-							placeholder={item.price.toFixed(2)}
-							disabled
-						/>
-					</div>
-					<button className="item-action-button" type="button" disabled>
-						Bidding coming soon
-					</button>
+					<BidForm auctionId={item.auctionId} />
 				</aside>
 			</div>
 			<Link className="nav-link cart-continue" href="/store">

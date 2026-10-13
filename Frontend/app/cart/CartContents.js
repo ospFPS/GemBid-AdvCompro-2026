@@ -2,20 +2,19 @@
 
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
+import { api, formatTHB } from "../lib/api";
 import {
 	getCartSnapshot,
 	getServerCartSnapshot,
 	parseCartSnapshot,
+	readCartIds,
 	removeCartItem,
 	saveCartIds,
 	subscribeToCart,
 } from "./cartStorage";
 
 function formatPrice(price) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(price);
+	return formatTHB(price);
 }
 
 export default function CartContents({ listings }) {
@@ -26,6 +25,7 @@ export default function CartContents({ listings }) {
 	);
 	const { ids: cartIds, error: storageError } = parseCartSnapshot(cartSnapshot);
 	const [actionError, setActionError] = useState("");
+	const [checkingOut, setCheckingOut] = useState(false);
 
 	function updateCart(action, itemId) {
 		try {
@@ -38,6 +38,26 @@ export default function CartContents({ listings }) {
 		} catch (updateError) {
 			setActionError(updateError instanceof Error ? updateError.message : "Unable to update the cart.");
 		}
+	}
+
+	// Each listing is one unique gem, so checkout buys every listing in the cart once.
+	async function checkout() {
+		setCheckingOut(true);
+		const failed = [];
+		for (const { item } of cartItems) {
+			try {
+				await api(`/api/listings/${item.id}/buy`, { method: "POST" });
+				saveCartIds(readCartIds().filter((id) => id !== item.id));
+			} catch (err) {
+				failed.push(`${item.title}: ${err.message}`);
+			}
+		}
+		if (failed.length === 0) {
+			window.location.href = "/my-purchases";
+			return;
+		}
+		setActionError(`Some items could not be bought. ${failed.join(" ")}`);
+		setCheckingOut(false);
 	}
 
 	function clearInvalidCart() {
@@ -120,8 +140,13 @@ export default function CartContents({ listings }) {
 						<span>Total</span>
 						<strong>{formatPrice(totalPrice)}</strong>
 					</p>
-					<button className="item-action-button" type="button" disabled>
-						Buying coming soon
+					<button
+						className="item-action-button"
+						type="button"
+						onClick={checkout}
+						disabled={checkingOut || cartItems.length === 0}
+					>
+						{checkingOut ? "Placing orders..." : "Checkout"}
 					</button>
 				</aside>
 			</div>

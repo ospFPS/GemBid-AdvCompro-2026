@@ -1,11 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { listings } from "../../../data/listings";
+import { api, formatDate, toMyListing } from "../../../lib/api";
 
 export default function ViewListing() {
     const params = useParams();
-    const listing = listings.find((item) => item.id === Number(params.id));
+    const [listing, setListing] = useState(undefined);
+
+    useEffect(() => {
+        api("/api/seller/listings")
+            .then((list) => setListing(list.map(toMyListing).find((item) => item.id === Number(params.id)) ?? null))
+            .catch(() => setListing(null));
+    }, [params.id]);
+
+    if (listing === undefined) {
+        return <main className="view-listing-page"><p>Loading listing...</p></main>;
+    }
 
     if (!listing) {
         return (
@@ -21,7 +32,7 @@ export default function ViewListing() {
 
     return (
         <main className="view-listing-page">
-            <a href="/" className="view-listings-home">
+            <a href="/store" className="view-listings-home">
                 <button type="button">Home</button>
             </a>
             <div>
@@ -63,15 +74,14 @@ export default function ViewListing() {
                         <div className="view-listing-auction">
                             <h2>Auction Details</h2>
                             <p>
-                                <strong>Starting Price:</strong> {listing.price}
+                                <strong>Current Price:</strong> {listing.price}
+                            </p>
+                            <p>
+                                <strong>Ends:</strong> {formatDate(listing.endTime)}
                             </p>
                             <p>
                                 <strong>Minimum Bid Increment:</strong>{" "}
                                 {listing.minimumIncrement || "Not specified"}
-                            </p>
-                            <p>
-                                <strong>Reserve Price:</strong>{" "}
-                                {listing.reservePrice || "Not specified"}
                             </p>
                         </div>
                     )}

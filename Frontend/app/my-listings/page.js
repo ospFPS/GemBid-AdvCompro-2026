@@ -1,8 +1,16 @@
 "use client";
-import { useState } from "react";
-import {listings} from "../data/listings";
+import { useEffect, useState } from "react";
+import { api, toMyListing } from "../lib/api";
 export default function MyListings() {
     const [filter, setFilter] = useState("all");
+    const [listings, setListings] = useState([]);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        api("/api/seller/listings")
+            .then((list) => setListings(list.map(toMyListing)))
+            .catch((err) => setError(err.message));
+    }, []);
     const filteredListings = listings.filter((listing) => {
         if (filter === "all") {
             return true;
@@ -13,8 +21,8 @@ export default function MyListings() {
     return (
         <main className="my-listings-page">
             <div className="my-listings-sticky-nav">
-                <a href="/" className="my-listings-home-link">
-                    ← Back to Home
+                <a href="/store" className="my-listings-home-link">
+                    ← Back to Store
                 </a>
                 <div className="listing-filters">
                     {["all", "active", "draft", "sold", "unsold"].map(
@@ -44,6 +52,7 @@ export default function MyListings() {
                     <p>Manage your gemstone listings and sales.</p>
                 </div>
             </div>
+            {error && <p role="alert">{error}</p>}
             <div className="listings-list">
                 {filteredListings.length > 0 ? (
                     filteredListings.map((listing) => (
@@ -78,18 +87,10 @@ export default function MyListings() {
                                             View
                                         </button>
                                     </a>
-                                    {listing.status === "Draft" && (
-                                        <a href={`/my-listings/edit-listings/${listing.id}`} className="listing-edit-button">
+                                    {listing.live && (
+                                        <a href={`/item?id=${listing.id}`} className="listing-view-button">
                                             <button>
-                                                Edit  
-                                            </button>
-                                        </a>
-                                    )}
-                                   
-                                   {listing.status === "Unsold" && (
-                                        <a href={`/my-listings/edit-listings/${listing.id}`} className="listing-relist-button">
-                                            <button>
-                                                Relist 
+                                                See in Store
                                             </button>
                                         </a>
                                     )}
