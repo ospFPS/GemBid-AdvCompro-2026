@@ -555,8 +555,9 @@ docker compose up -d --build
 
 | Service | URL |
 |---|---|
-| Website | `http://thalamus:3000` |
-| Backend API | `http://thalamus:8080` (Swagger at `/docs`) |
+| Website (public, ngrok) | `https://angular-snorkel-passive.ngrok-free.dev` |
+| Website (Tailscale) | `http://thalamus:3000` |
+| Backend API + Swagger (Tailscale only) | `http://thalamus:8080`, Swagger at `/docs` |
 
 The frontend container proxies `/api/*` to the backend container (`BACKEND_URL=http://backend:8080`, set in `docker-compose.yml`).
 
@@ -581,3 +582,52 @@ BACKEND_URL=http://thalamus:8080 npm run dev
   - Two users bid: a too-low bid gets 409, a seller self-bid gets 403, and the outbid notification is sent.
   - Notifications arrive for both sides.
 - The rendered store and item pages show the real gems, shop name, baht prices and photos.
+
+## 3.4 Public access (ngrok)
+
+- The ngrok endpoint now points at the **website (port 3000)** instead of the backend. The website proxies `/api/*` to the backend, so the one public URL serves both the site and the API.
+- Swagger (`/docs`) is no longer public; use `http://thalamus:8080/docs` over Tailscale.
+- ngrok now runs as the `ayase` user (not root), so it can be restarted without sudo:
+  ```bash
+  pkill -f "ngrok start --all"
+  setsid nohup ngrok start --all --config=$HOME/.config/ngrok/ngrok.yml >/tmp/ngrok.log 2>&1 < /dev/null &
+  ```
+  If it exits with `ERR_NGROK_334`, the old connection hasn't been released yet; wait a few seconds and start it again.
+- The previous config (pointing at port 8080) is saved as `~/.config/ngrok/ngrok.yml.bak-8080`.
+- Free ngrok shows a one-time "You are about to visit…" page; click **Visit Site**.
+
+## 3.5 Testing the site
+
+**Demo accounts** (one shared password; ask Earn, it's not stored in the repo):
+
+| Username | Role | Good for |
+|---|---|---|
+| `demo_seller` | Verified seller ("Siam Gem House") | Create listings, seller orders, shipping, my listings |
+| `demo_buyer` | Buyer (one delivered order) | Buying, paying, order tracking, notifications |
+| `demo_bidder` | Buyer (leads the ruby auction) | Bidding against `demo_buyer` |
+| `demo_admin` | Admin | Seller approvals and reports, via Swagger |
+
+**Test scenarios:**
+
+1. **Buy:** as a buyer, open a "Buy now" item → **Buy now** → pay (simulated) → the seller marks it shipped in **Seller Orders** → the buyer clicks **I received my gem**. Check **Notifications** on both accounts.
+2. **Bid:** two buyers bid on an auction; the outbid user gets a notification, and **My Bids** shows Winning or Outbid. For a quick end-to-end test, create an auction with the **"5 minutes (demo)"** duration; about 30 seconds after it ends, the winner gets an order to pay in **My Purchases**.
+3. **Sell:** as `demo_seller`, use **Create Listing** (fixed price or auction) or **Save Draft**, then check **My Listings**. The FREE plan allows 5 live listings; after that, **Profile → Upgrade to PRO**.
+4. **Become a seller:** sign up → **Become a Seller** → an admin approves it in Swagger (below) → the seller links appear in the header.
+5. **Profile:** edit details, change password (needs the current one), log out.
+
+**Admin actions:** the website has no admin pages, so use Swagger:
+1. Open `http://thalamus:8080/docs`.
+2. Call `POST /api/login` as `demo_admin` and copy the `token`.
+3. Click **Authorize** and enter `Bearer <token>`.
+4. The admin endpoints are listed in section 2.4.
+
+Any account can be made an admin with this SQL:
+`UPDATE users SET role = 'ADMIN' WHERE username = '...';`
+
+**Expected gaps (not bugs):**
+- Seller Analytics, My Auctions, Edit Listing and Home still show mock data.
+- Photos are chosen by gem type, since there's no image upload yet.
+- There is no admin UI.
+- Seller orders show buyers as "Buyer #id".
+
+**Not merged to `main` yet:** more team code is coming. It will be merged into `Earn_TTB` and tested the same way before anything goes to `main`.
