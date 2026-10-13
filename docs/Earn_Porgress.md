@@ -722,3 +722,16 @@ To go back to the clean seed, run `backend/db/seed_demo.py --wipe` (section 3.6)
 - Seller orders show `Buyer #id`.
 
 **Status:** ready for review. Not merged to `main`.
+
+## 3.8 Database cleared (14 October 2026)
+
+All data was wiped and reseeded with `python3 backend/db/seed_demo.py --wipe --minimal`. The database now holds only:
+
+| What | Details |
+|---|---|
+| `admin` | Admin account |
+| `siam_gems` | Verified seller "Siam Gem House" (needed to own the listings) |
+| 2 fixed-price listings | Royal Blue Sapphire ฿12,500 · Diamond Solitaire Ring ฿45,000 |
+| 2 auctions (7 days, no bids) | Pigeon Blood Ruby from ฿5,000 (reserve ฿6,000) · Colombian Emerald from ฿7,000 |
+
+There are no buyers, bids, orders, notifications or reports. The demo accounts in section 3.5 (alice, bob, chai and the others) no longer exist; sign up new ones on the site, or run `seed_demo.py --wipe` for the full demo set.
