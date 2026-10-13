@@ -96,28 +96,40 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type ListingListItem struct {
-	ListingID  int64    `json:"listing_id"`
-	GemID      int64    `json:"gem_id"`
-	GemName    string   `json:"gem_name"`
-	GemType    string   `json:"gem_type"`
-	SaleType   *string  `json:"sale_type"`
-	Status     string   `json:"status"`
-	FixedPrice *float64 `json:"fixed_price"`
+	ListingID        int64      `json:"listing_id"`
+	GemID            int64      `json:"gem_id"`
+	GemName          string     `json:"gem_name"`
+	GemType          string     `json:"gem_type"`
+	SaleType         *string    `json:"sale_type"`
+	Status           string     `json:"status"`
+	FixedPrice       *float64   `json:"fixed_price"`
+	Description      *string    `json:"description"`
+	SellerID         int64      `json:"seller_id"`
+	ShopName         string     `json:"shop_name"`
+	AuctionID        *int64     `json:"auction_id"`
+	CurrentPrice     *float64   `json:"current_price"`
+	MinimumIncrement *float64   `json:"minimum_increment"`
+	EndTime          *time.Time `json:"end_time"`
 }
 
-func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
+// listListings returns listings with gem, shop and auction details, filtered by where.
+func listListings(w http.ResponseWriter, r *http.Request, where string, args ...any) {
 	rows, err := DB.Query(
 		r.Context(),
 		`
 		SELECT
-			l.listing_id, l.gem_id, g.gem_name, g.gem_type, l.sale_type, l.status, l.fixed_price
+			l.listing_id, l.gem_id, g.gem_name, g.gem_type, l.sale_type, l.status, l.fixed_price,
+			g.description, l.seller_id, sp.shop_name,
+			a.auction_id, a.current_price, a.minimum_increment, a.end_time
 		FROM public.listings l
 		INNER JOIN public.gems g ON g.gem_id = l.gem_id
-		WHERE l.status IN ('PUBLISHED', 'ACTIVE')
-		ORDER BY l.published_at DESC NULLS LAST
+		INNER JOIN public.seller_profiles sp ON sp.seller_id = l.seller_id
+		LEFT JOIN public.auctions a ON a.listing_id = l.listing_id
+		WHERE `+where+`
+		ORDER BY l.published_at DESC NULLS LAST, l.created_at DESC
 		`,
+		args...,
 	)
-
 	if err != nil {
 		http.Error(w, "Could not fetch listings", http.StatusInternalServerError)
 		return
@@ -127,6 +139,8 @@ func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 		err := row.Scan(
 			&item.ListingID, &item.GemID, &item.GemName, &item.GemType,
 			&item.SaleType, &item.Status, &item.FixedPrice,
+			&item.Description, &item.SellerID, &item.ShopName,
+			&item.AuctionID, &item.CurrentPrice, &item.MinimumIncrement, &item.EndTime,
 		)
 		return item, err
 	})
@@ -136,6 +150,16 @@ func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, listings)
+}
+
+func ListListingsHandler(w http.ResponseWriter, r *http.Request) {
+	listListings(w, r, `l.status IN ('PUBLISHED', 'ACTIVE')`)
+}
+
+// MySellerListingsHandler returns the verified seller's own listings in every status, drafts included.
+func MySellerListingsHandler(w http.ResponseWriter, r *http.Request) {
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
+	listListings(w, r, `l.seller_id = $1`, sellerID)
 }
 
 func GetListingHandler(w http.ResponseWriter, r *http.Request) {

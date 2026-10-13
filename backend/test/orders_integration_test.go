@@ -79,6 +79,8 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	})
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/listings", ListListingsHandler)
+	mux.HandleFunc("GET /api/seller/listings", AuthMiddleware(VerifiedSellerMiddleware(MySellerListingsHandler)))
 	mux.HandleFunc("POST /api/listings/{id}/buy", AuthMiddleware(BuyNowHandler))
 	mux.HandleFunc("GET /api/orders/{id}", AuthMiddleware(GetOrderHandler))
 	mux.HandleFunc("POST /api/orders/{id}/pay", AuthMiddleware(PayOrderHandler))
@@ -113,6 +115,29 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 		}
 		return d.Order.Status
 	}
+
+	// --- Listing lists used by the frontend ---
+	findListing := func(body []byte, id int64) *ListingListItem {
+		t.Helper()
+		var items []ListingListItem
+		if err := json.Unmarshal(body, &items); err != nil {
+			t.Fatal(err)
+		}
+		for i := range items {
+			if items[i].ListingID == id {
+				return &items[i]
+			}
+		}
+		return nil
+	}
+	if item := findListing(call("GET", "/api/listings", "", nil, http.StatusOK), listingA); item == nil ||
+		item.ShopName == "" || item.SellerID != sellerID || item.AuctionID != nil {
+		t.Fatalf("public listing %d missing seller details: %+v", listingA, item)
+	}
+	if findListing(call("GET", "/api/seller/listings", seller, nil, http.StatusOK), listingA) == nil {
+		t.Fatalf("seller listings should include %d", listingA)
+	}
+	call("GET", "/api/seller/listings", buyer, nil, http.StatusForbidden)
 
 	call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), seller, nil, http.StatusForbidden)
 	var order OrderResponse

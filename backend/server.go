@@ -42,6 +42,8 @@ func Run() {
 	mux.HandleFunc("POST /api/seller/apply", AuthMiddleware(SellerApplyHandler))
 
 	mux.HandleFunc("GET /api/seller/status", AuthMiddleware(SellerStatusHandler))
+	mux.HandleFunc("GET /api/seller/listings", AuthMiddleware(VerifiedSellerMiddleware(MySellerListingsHandler)))
+	mux.HandleFunc("GET /api/me/bids", AuthMiddleware(MyBidsHandler))
 
 	mux.HandleFunc("GET /api/admin/seller-applications", AuthMiddleware(AdminMiddleware(AdminSellerApplicationsHandler)))
 
