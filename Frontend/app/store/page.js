@@ -73,6 +73,7 @@ export default async function StorePage({ searchParams }) {
           <li><Link className="nav-link" href="/">Return to Home</Link></li>
           <li><Link className="nav-link" href="/login">Log in</Link></li>
           <li><Link className="nav-link" href="/signup">Sign up</Link></li>
+          <li><Link className="nav-link" href="/admin">Admin dashboard</Link></li>
         </ul>
       </nav>
 
