@@ -17,14 +17,13 @@ export default async function ItemPage({ searchParams }) {
 
 	return (
 		<main className="item-detail-layout">
-			<Link className="nav-link" href="/store">
+			<Link className="item-back-link" href="/store">
+				<span aria-hidden="true">←</span>
 				Back to marketplace
 			</Link>
 			<article className="item-detail">
 				<div className="item-detail-imageBox">
-					<div>
-						<img src={item.image} alt={item.title} />
-					</div>
+					<img src={item.image} alt={item.title} />
 				</div>
 				<div className="item-detail-infoBox">
 					<div>
@@ -38,13 +37,16 @@ export default async function ItemPage({ searchParams }) {
 						<div className="item-detail-seller">
 							<img src={item.pfp} alt="" />
 							<div>
-								<span className="seller-label">Seller</span>
+								<span className="seller-label">Listed by</span>
 								<strong>{item.seller}</strong>
 							</div>
 						</div>
-						<p className="item-detail-price">
-							{formatTHB(item.price)}
-						</p>
+						<div className="item-detail-price-box">
+							<span>Price</span>
+							<p className="item-detail-price">
+								{formatTHB(item.price)}
+							</p>
+						</div>
 						{/* button for bid or buy */}
 						<div className="item-detail-actions">
 							{item.isBid ? (
@@ -58,7 +60,7 @@ export default async function ItemPage({ searchParams }) {
 								<>
 									<BuyNowButton itemId={item.id} />
 									<AddToCartButton itemId={item.id} />
-									<Link className="nav-link" href="/cart">View cart</Link>
+									<Link className="item-action-button item-action-button--secondary" href="/cart">View cart</Link>
 								</>
 							)}
 						</div>

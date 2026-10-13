@@ -39,6 +39,9 @@ export default function AccountNav() {
 	return (
 		<ul>
 			<li><span className="nav-link">Hi, {user.username}</span></li>
+			{user.role === "ADMIN" && (
+				<li><Link className="nav-link" href="/admin">Admin Dashboard</Link></li>
+			)}
 			<li><Link className="nav-link" href="/cart">Cart</Link></li>
 			<li><Link className="nav-link" href="/my-purchases">My Purchases</Link></li>
 			<li><Link className="nav-link" href="/my-bids">My Bids</Link></li>

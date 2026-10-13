@@ -33,12 +33,16 @@ export async function getListings({
 	minPrice,
 	maxPrice,
 	searchTitle = "",
+	listingType = "all",
 } = {}) {
 	const normalizedTitle = searchTitle.trim().toLowerCase();
 	// Filter titles without regard to capitalization.
 	const filteredItems = (await fetchItems()).filter((item) =>
 		(minPrice === undefined || item.price >= minPrice)
 		&& (maxPrice === undefined || item.price <= maxPrice)
+		&& (listingType === "all"
+			|| (listingType === "buy-now" && !item.isBid)
+			|| (listingType === "bid" && item.isBid))
 		&& item.title.toLowerCase().includes(normalizedTitle)
 	);
 	const total = filteredItems.length;
