@@ -10,7 +10,7 @@ function toBidCard(b) {
         id: b.auction_id,
         listingId: b.listing_id,
         gemstone: b.gem_name,
-        image: gemImage(b.gem_type),
+        image: b.image_url || gemImage(b.gem_type),
         yourBid: formatTHB(b.my_highest_bid),
         currentBid: formatTHB(b.current_price),
         status: ended ? (b.is_winner ? "Won" : "Lost") : b.is_leading ? "Winning" : "Outbid",

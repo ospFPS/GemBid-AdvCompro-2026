@@ -928,6 +928,7 @@ type MyBidItem struct {
 	IsLeading     bool      `json:"is_leading"`
 	IsWinner      bool      `json:"is_winner"`
 	LastBidTime   time.Time `json:"last_bid_time"`
+	ImageURL      *string   `json:"image_url"`
 }
 
 // MyBidsHandler returns one row per auction the user bid on, with their highest bid.
@@ -941,11 +942,12 @@ func MyBidsHandler(w http.ResponseWriter, r *http.Request) {
 				b.bid_amount, b.bid_status, a.current_price, a.status, a.end_time,
 				COALESCE(a.current_highest_bidder_id = $1, FALSE),
 				COALESCE(a.winner_id = $1, FALSE),
-				b.bid_time
+				b.bid_time, gi.image_url
 			FROM public.bids b
 			INNER JOIN public.auctions a ON a.auction_id = b.auction_id
 			INNER JOIN public.listings l ON l.listing_id = a.listing_id
 			INNER JOIN public.gems g ON g.gem_id = l.gem_id
+			LEFT JOIN public.gem_images gi ON gi.gem_id = g.gem_id AND gi.is_primary
 			WHERE b.bidder_id = $1
 			ORDER BY a.auction_id, b.bid_amount DESC, b.bid_time DESC
 		) mine
@@ -959,7 +961,7 @@ func MyBidsHandler(w http.ResponseWriter, r *http.Request) {
 		var b MyBidItem
 		err := row.Scan(&b.AuctionID, &b.ListingID, &b.GemName, &b.GemType, &b.MyHighestBid,
 			&b.MyBidStatus, &b.CurrentPrice, &b.AuctionStatus, &b.EndTime, &b.IsLeading,
-			&b.IsWinner, &b.LastBidTime)
+			&b.IsWinner, &b.LastBidTime, &b.ImageURL)
 		return b, err
 	})
 	if err != nil {

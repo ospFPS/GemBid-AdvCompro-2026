@@ -110,6 +110,7 @@ type ListingListItem struct {
 	CurrentPrice     *float64   `json:"current_price"`
 	MinimumIncrement *float64   `json:"minimum_increment"`
 	EndTime          *time.Time `json:"end_time"`
+	ImageURL         *string    `json:"image_url"`
 }
 
 // listListings returns listings with gem, shop and auction details, filtered by where.
@@ -120,11 +121,12 @@ func listListings(w http.ResponseWriter, r *http.Request, where string, args ...
 		SELECT
 			l.listing_id, l.gem_id, g.gem_name, g.gem_type, l.sale_type, l.status, l.fixed_price,
 			g.description, l.seller_id, sp.shop_name,
-			a.auction_id, a.current_price, a.minimum_increment, a.end_time
+			a.auction_id, a.current_price, a.minimum_increment, a.end_time, gi.image_url
 		FROM public.listings l
 		INNER JOIN public.gems g ON g.gem_id = l.gem_id
 		INNER JOIN public.seller_profiles sp ON sp.seller_id = l.seller_id
 		LEFT JOIN public.auctions a ON a.listing_id = l.listing_id
+		LEFT JOIN public.gem_images gi ON gi.gem_id = l.gem_id AND gi.is_primary
 		WHERE `+where+`
 		ORDER BY l.published_at DESC NULLS LAST, l.created_at DESC
 		`,
@@ -140,7 +142,7 @@ func listListings(w http.ResponseWriter, r *http.Request, where string, args ...
 			&item.ListingID, &item.GemID, &item.GemName, &item.GemType,
 			&item.SaleType, &item.Status, &item.FixedPrice,
 			&item.Description, &item.SellerID, &item.ShopName,
-			&item.AuctionID, &item.CurrentPrice, &item.MinimumIncrement, &item.EndTime,
+			&item.AuctionID, &item.CurrentPrice, &item.MinimumIncrement, &item.EndTime, &item.ImageURL,
 		)
 		return item, err
 	})

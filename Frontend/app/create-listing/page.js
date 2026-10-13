@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "../lib/api";
+import { api, resizeImage } from "../lib/api";
 
 const AUCTION_DURATIONS = [
     { label: "5 minutes (demo)", minutes: 5 },
@@ -26,12 +26,18 @@ export default function CreateListing() {
     const [durationMinutes, setDurationMinutes] = useState(60 * 24);
     const [busy, setBusy] = useState(false);
 
-    // Gem -> DRAFT listing. Images and certificates are not uploaded yet (no backend support).
+    // Gem (+ photos, first one is the main photo) -> DRAFT listing. Certificates are not uploaded yet.
     async function createDraft() {
         const gem = (await api("/api/gems", {
             method: "POST",
             body: { gem_name: gemstoneName, gem_type: gemstoneType, description },
         })).gem;
+        for (const file of images) {
+            await api(`/api/gems/${gem.gem_id}/images`, {
+                method: "POST",
+                body: { image_url: await resizeImage(file) },
+            });
+        }
         return (await api("/api/listings", { method: "POST", body: { gem_id: gem.gem_id } })).listing;
     }
 
@@ -138,7 +144,7 @@ export default function CreateListing() {
                     </div>
                 </section>
                 <section className="listing-form-section">
-                    <h2>Gemstone Images (preview only, not uploaded yet)</h2>
+                    <h2>Gemstone Images</h2>
                     <div className="listing-form-group">
                         <label htmlFor="images">Upload Images</label>
                         <input
@@ -149,9 +155,21 @@ export default function CreateListing() {
                             onChange={(event) => setImages(Array.from(event.target.files || []))}
                         />
                         {images.length > 0 && (
-                            <p className="selected-file-info">
-                                {images.length} image(s) selected
-                            </p>
+                            <>
+                                <p className="selected-file-info">
+                                    {images.length} image(s) selected. The first one is the main photo.
+                                </p>
+                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                    {images.map((file) => (
+                                        <img
+                                            key={file.name + file.size}
+                                            src={URL.createObjectURL(file)}
+                                            alt={file.name}
+                                            style={{ width: "96px", height: "96px", objectFit: "cover", borderRadius: "8px" }}
+                                        />
+                                    ))}
+                                </div>
+                            </>
                         )}
                     </div>
                 </section>

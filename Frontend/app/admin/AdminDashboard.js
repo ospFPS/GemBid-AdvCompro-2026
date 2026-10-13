@@ -295,7 +295,7 @@ export default function AdminDashboard() {
 									<tr key={listing.listing_id}>
 										<td>
 											<div className="admin-listing-cell">
-												<img src={gemImage(listing.gem_type)} alt="" />
+												<img src={listing.image_url || gemImage(listing.gem_type)} alt="" />
 												<div>
 													<strong>{listing.gem_name}</strong>
 													<span>{listing.shop_name}</span>

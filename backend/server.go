@@ -57,6 +57,7 @@ func Run() {
 
 	mux.HandleFunc("PUT /api/gems/{id}", AuthMiddleware(VerifiedSellerMiddleware(UpdateGemHandler)))
 
+	mux.HandleFunc("POST /api/gems/{id}/images", AuthMiddleware(VerifiedSellerMiddleware(AddGemImageHandler)))
 	mux.HandleFunc("DELETE /api/gems/{id}", AuthMiddleware(VerifiedSellerMiddleware(DeleteGemHandler)))
 
 	mux.HandleFunc("POST /api/listings", AuthMiddleware(VerifiedSellerMiddleware(CreateListingHandler)))

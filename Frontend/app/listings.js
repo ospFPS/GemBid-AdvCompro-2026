@@ -8,7 +8,7 @@ function toItem(listing) {
 		id: String(listing.listing_id),
 		title: listing.gem_name,
 		description: listing.description || `${listing.gem_type} gemstone`,
-		image: gemImage(listing.gem_type),
+		image: listing.image_url || gemImage(listing.gem_type),
 		price: (isBid ? listing.current_price : listing.fixed_price) ?? 0,
 		isBid,
 		pfp: "/assets/pfp.png",

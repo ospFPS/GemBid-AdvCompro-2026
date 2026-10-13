@@ -68,6 +68,24 @@ const GEM_IMAGES = {
 	pearl: "/assets/my-purchases/Pearl ring.webp",
 };
 
+// Shrink a picked photo in the browser (max 1000px JPEG) and return it as a data URL for upload.
+export function resizeImage(file, maxSize = 1000) {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+			const canvas = document.createElement("canvas");
+			canvas.width = Math.round(img.width * scale);
+			canvas.height = Math.round(img.height * scale);
+			canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+			URL.revokeObjectURL(img.src);
+			resolve(canvas.toDataURL("image/jpeg", 0.85));
+		};
+		img.onerror = () => reject(new Error(`${file.name} is not an image the browser can read.`));
+		img.src = URL.createObjectURL(file);
+	});
+}
+
 export function gemImage(gemType) {
 	return GEM_IMAGES[(gemType ?? "").trim().toLowerCase()] ?? "/assets/my-purchases/Yellow sapphire.webp";
 }
@@ -108,7 +126,7 @@ export async function toPurchase(order) {
 		id: order.order_id,
 		gemstone: gem?.gem_name ?? `Listing #${order.listing_id}`,
 		gemType: gem?.gem_type,
-		image: gemImage(gem?.gem_type),
+		image: gem?.image_url || gemImage(gem?.gem_type),
 		orderId: `ORD-${String(order.order_id).padStart(3, "0")}`,
 		purchaseType: order.auction_id ? "Auction" : "Fixed Price",
 		price: formatTHB(order.total_amount),
@@ -128,7 +146,7 @@ export function toMyListing(l) {
 	return {
 		id: l.listing_id,
 		gemstone: l.gem_name,
-		image: gemImage(l.gem_type),
+		image: l.image_url || gemImage(l.gem_type),
 		price: price == null ? "Not set" : formatTHB(price),
 		listingType: isAuction ? "Auction" : l.sale_type ? "Fixed Price" : "Not chosen",
 		status: LISTING_STATUS_LABELS[l.status] ?? l.status.charAt(0) + l.status.slice(1).toLowerCase(),

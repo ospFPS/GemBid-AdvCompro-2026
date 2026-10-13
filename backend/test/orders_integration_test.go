@@ -80,6 +80,7 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/listings", ListListingsHandler)
+	mux.HandleFunc("POST /api/gems/{id}/images", AuthMiddleware(VerifiedSellerMiddleware(AddGemImageHandler)))
 	mux.HandleFunc("GET /api/seller/listings", AuthMiddleware(VerifiedSellerMiddleware(MySellerListingsHandler)))
 	mux.HandleFunc("POST /api/listings/{id}/buy", AuthMiddleware(BuyNowHandler))
 	mux.HandleFunc("GET /api/orders/{id}", AuthMiddleware(GetOrderHandler))
@@ -140,6 +141,17 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 		t.Fatalf("seller listings should include %d", listingA)
 	}
 	call("GET", "/api/seller/listings", buyer, nil, http.StatusForbidden)
+
+	// --- Gem image upload ---
+	imagePath := fmt.Sprintf("/api/gems/%d/images", gemID)
+	pixel := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+	call("POST", imagePath, buyer, map[string]any{"image_url": pixel}, http.StatusForbidden)
+	call("POST", imagePath, seller, map[string]any{"image_url": "https://example.com/x.png"}, http.StatusBadRequest)
+	call("POST", imagePath, seller, map[string]any{"image_url": pixel}, http.StatusCreated)
+	if item := findListing(call("GET", "/api/listings", "", nil, http.StatusOK), listingA); item == nil ||
+		item.ImageURL == nil || *item.ImageURL != pixel {
+		t.Fatalf("listing %d should show the uploaded image: %+v", listingA, item)
+	}
 
 	call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), seller, nil, http.StatusForbidden)
 	var order OrderResponse
