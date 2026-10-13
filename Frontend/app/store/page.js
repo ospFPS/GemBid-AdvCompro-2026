@@ -10,6 +10,12 @@ function getSingleParam(value) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const LISTING_TYPES = [
+  { value: "all", label: "All" },
+  { value: "buy-now", label: "Buy now" },
+  { value: "bid", label: "Bid" },
+];
+
 function parseOptionalPrice(value, label) {
   const rawValue = getSingleParam(value);
   if (rawValue === undefined || rawValue.trim() === "") {
@@ -43,13 +49,18 @@ export default async function StorePage({ searchParams }) {
   const minPrice = minPriceResult.value;
   const maxPrice = maxPriceResult.value;
   const searchTitle = getSingleParam(params.search)?.trim() ?? "";
+  const requestedListingType = getSingleParam(params.listingType);
+  const listingType = LISTING_TYPES.some((type) => type.value === requestedListingType)
+    ? requestedListingType
+    : "all";
   const result = priceError
     ? null
-    : await getListings({ page, pageSize, minPrice, maxPrice, searchTitle });
+    : await getListings({ page, pageSize, minPrice, maxPrice, searchTitle, listingType });
   const filterQuery = {
     ...(minPrice !== undefined ? { minPrice } : {}),
     ...(maxPrice !== undefined ? { maxPrice } : {}),
     ...(searchTitle ? { search: searchTitle } : {}),
+    listingType,
   };
 
   return (
@@ -62,21 +73,35 @@ export default async function StorePage({ searchParams }) {
           <li><Link className="nav-link" href="/">Return to Home</Link></li>
           <li><Link className="nav-link" href="/login">Log in</Link></li>
           <li><Link className="nav-link" href="/signup">Sign up</Link></li>
+          <li><Link className="nav-link" href="/admin">Admin dashboard</Link></li>
         </ul>
       </nav>
 
       <div className="store-content">
         {/* side content */}
-        <nav className="store-left-nav" aria-label="Store navigation">
-          <ul>
-            <li><Link className="nav-link" href="/">Stuff 1</Link></li>
-            <li><Link className="nav-link" href="/">Stuff 2</Link></li>
-            <li><Link className="nav-link" href="/">Stuff 3</Link></li>
+        <nav className="store-left-nav" aria-label="Store filters">
+          <h2>Listing Setting</h2>
+          <ul className="listing-type-filter">
+            {LISTING_TYPES.map((type) => (
+              <li key={type.value}>
+                <Link
+                  className="nav-link"
+                  href={{
+                    pathname: "/store",
+                    query: { ...filterQuery, listingType: type.value, pageSize },
+                  }}
+                  aria-current={listingType === type.value ? "page" : undefined}
+                >
+                  {type.label}
+                </Link>
+              </li>
+            ))}
           </ul>
           {/* price filter */}
           <form className="price-filter" action="/store" method="get">
             <h2>Price range</h2>
             <input type="hidden" name="pageSize" value={pageSize} />
+            <input type="hidden" name="listingType" value={listingType} />
             {/* this "searchTitle" is added for the searchbar to functions properly, I am too lazy to organized it */}
             {searchTitle && (
               <input type="hidden" name="search" value={searchTitle} />
@@ -120,6 +145,7 @@ export default async function StorePage({ searchParams }) {
               defaultValue={searchTitle}
             />
             <input type="hidden" name="pageSize" value={pageSize} />
+            <input type="hidden" name="listingType" value={listingType} />
             {minPrice !== undefined && (
               <input type="hidden" name="minPrice" value={minPrice} />
             )}
@@ -141,6 +167,7 @@ export default async function StorePage({ searchParams }) {
             {searchTitle && (
               <input type="hidden" name="search" value={searchTitle} />
             )}
+            <input type="hidden" name="listingType" value={listingType} />
             <select id="page-size" name="pageSize" defaultValue={pageSize}>
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>{size}</option>

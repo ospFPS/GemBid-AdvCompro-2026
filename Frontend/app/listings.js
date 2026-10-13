@@ -7,7 +7,7 @@ const mockItems = [
 		price: 12.99,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "amog-1",
@@ -17,7 +17,7 @@ const mockItems = [
 		price: 24.5,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "fire-1",
@@ -27,7 +27,7 @@ const mockItems = [
 		price: 125.3,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "leek-2",
@@ -37,7 +37,7 @@ const mockItems = [
 		price: 18,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "amog-2",
@@ -47,7 +47,7 @@ const mockItems = [
 		price: 31.75,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "fire-2",
@@ -57,7 +57,7 @@ const mockItems = [
 		price: 132.2,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "leek-3",
@@ -67,7 +67,7 @@ const mockItems = [
 		price: 15.25,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "amog-3",
@@ -77,7 +77,7 @@ const mockItems = [
 		price: 42,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "fire-3",
@@ -87,7 +87,7 @@ const mockItems = [
 		price: 532.1,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 		{
 		id: "leek-4",
@@ -97,7 +97,7 @@ const mockItems = [
 		price: 16.35,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "amog-4",
@@ -107,7 +107,7 @@ const mockItems = [
 		price: 69.69,
 		isBid: false,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 	{
 		id: "fire-4",
@@ -117,7 +117,7 @@ const mockItems = [
 		price: 1253.25,
 		isBid: true,
 		pfp: "/assets/pfp.png",
-		seller: "Garfield",
+		seller: "GarfieldCMix",
 	},
 ];
 
@@ -130,12 +130,16 @@ export async function getListings({
 	minPrice,
 	maxPrice,
 	searchTitle = "",
+	listingType = "all",
 } = {}) {
 	const normalizedTitle = searchTitle.trim().toLowerCase();
 	// Filter titles without regard to capitalization.
 	const filteredItems = mockItems.filter((item) =>
 		(minPrice === undefined || item.price >= minPrice)
 		&& (maxPrice === undefined || item.price <= maxPrice)
+		&& (listingType === "all"
+			|| (listingType === "buy-now" && !item.isBid)
+			|| (listingType === "bid" && item.isBid))
 		&& item.title.toLowerCase().includes(normalizedTitle)
 	);
 	const total = filteredItems.length;

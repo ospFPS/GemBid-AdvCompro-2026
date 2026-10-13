@@ -18,7 +18,7 @@ export default function AddToCartButton({ itemId }) {
 	return (
 		<>
 			<button
-				className="item-action-button"
+				className="item-action-button item-action-button--secondary"
 				type="button"
 				onClick={handleAddToCart}
 			>
