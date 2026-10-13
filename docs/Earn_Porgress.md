@@ -1,6 +1,6 @@
 # GemBid — Earn Progress + Frontend API Guide
 
-**Updated:** 13 October 2026 (frontend integration on `Earn_TTB`)
+**Updated:** 14 October 2026 (final check-up on `Earn_TTB`, see section 3.7)
 **First written:** 5 October 2026 (backend cleanup, merged to `main`)
 
 This document has three parts:
@@ -668,3 +668,57 @@ python3 backend/db/seed_demo.py --wipe   # DELETES ALL DATA, then reseeds (~3 mi
 - Seller Analytics, My Auctions and Edit Listing / Relist still show mock data.
 - There's no "Report" button for users (reports can only be created through the API).
 - There are no admin user-management or bid-history pages.
+
+## 3.7 Final check-up (14 October 2026)
+
+Run on `Earn_TTB` @ `01a53f6`, deployed on thalamus.
+
+**Backend**
+
+| Check | Result |
+|---|---|
+| `gofmt`, `go build`, `go vet` | ✅ clean |
+| Integration tests against the database (8 suites: auction engine, auto-closer, quota concurrency, full API end-to-end, migration 020, orders/payment/shipping + admin suspend + photo upload, report moderation, security) | ✅ all pass, test data cleaned up |
+
+**Frontend**
+
+| Check | Result |
+|---|---|
+| `next build` (production) | ✅ 20 pages |
+| Every page on `http://thalamus:3000` (22 URLs incl. filters, item, bid, order and listing detail) | ✅ 22/22 load |
+| Same 22 URLs on the public ngrok URL | ✅ 22/22 load |
+| Unknown item | ✅ 404 page |
+
+**Live behaviour** (through the public URL, as the real accounts)
+
+| Check | Result |
+|---|---|
+| All 7 demo accounts log in; wrong password rejected | ✅ |
+| No token → 401; buyer → 403 on seller and admin endpoints; seller can't buy own listing; buyer can't see another buyer's order | ✅ |
+| Store: live listings with shop name and description; Buy now / Bid filter | ✅ |
+| Admin: analytics, seller applications, all listings (incl. drafts and sold), reports | ✅ |
+| Buyers: orders, bids and notifications load; sellers: seller orders and My Listings | ✅ |
+| FREE seller at the 5-listing limit, PRO seller unlimited | ✅ |
+| Photo upload: owner allowed, other seller blocked, photo shown (temporary gem, deleted after) | ✅ |
+
+**Server**
+- Both containers are up with 0 restarts and no errors in the logs.
+- The disk is at 40% (21 GB).
+- ngrok runs as `ayase`, pointing at the website.
+
+**Demo data now** (changed by hand testing since the seed):
+- `lanna_stones` was approved through the admin dashboard.
+- `alice` applied as a seller (shop "asd") and was approved.
+- A few extra listings were created.
+
+To go back to the clean seed, run `backend/db/seed_demo.py --wipe` (section 3.6). That deletes everything.
+
+**Cleanup this round:** removed a stray compiled `.pyc` file, the unused `data/purchases.js` mock, `deploy.sh` (its `git pull` needed the SSH passphrase; deploys use `docker compose up -d --build` instead), an unused helper, and two formatting wrappers.
+
+**Known gaps (unchanged):**
+- Seller Analytics, My Auctions and Edit Listing / Relist are still mock.
+- There's no user "Report" button.
+- There are no admin user-management or bid-history pages.
+- Seller orders show `Buyer #id`.
+
+**Status:** ready for review. Not merged to `main`.
