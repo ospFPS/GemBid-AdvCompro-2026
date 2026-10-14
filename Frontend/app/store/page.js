@@ -67,7 +67,6 @@ export default async function StorePage({ searchParams }) {
 
   return (
     <main className="store-layout">
-      <img src="/assets/Dependencies2.gif"/>
       <h1 className="title">GemBid</h1>
       {/* Top tab */}
       <nav className="store-top-nav" aria-label="Account navigation">
