@@ -1,0 +1,102 @@
+/* =========================
+   My Bids Page
+   ========================= */
+.my-bids-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.my-bids-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.my-bids-home-link:hover {
+    text-decoration: underline;
+}
+.my-bids-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.bid-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.bid-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.bid-filters button.active {
+    background-color: #cccccc;
+}
+.bid-filters button:hover {
+    background-color: #eeeeee;
+}
+.my-bids-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.bids-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.bid-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 3rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.bid-card img {
+    width: 350px;
+    height: 300px;
+    object-fit: cover;
+}
+.bids-list h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.bids-list p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.bid-action-button {
+    display: inline-block;
+    padding: 0.5rem 1.2rem;
+    background-color: #9b7545;
+    color: white;
+    text-decoration: none;
+    border-radius: 0;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+.bid-action-button:hover {
+    background-color: #85633b;
+}
+.bid-status {
+    font-weight: bold;
+}
+.bid-status-winning {
+    color: rgb(157, 177, 157);
+}
+.bid-status-won {
+    color: darkgreen;
+}
+.bid-status-outbid {
+    color: rgb(248, 136, 136)
+}
+.bid-status-lost {
+    color: red;
+}

@@ -2,6 +2,7 @@ package gembid
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -365,49 +366,11 @@ func AdminReviewReportHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "This report does not target a listing or auction", http.StatusConflict)
 				return
 			}
-			if auctionID == 0 {
-				_ = tx.QueryRow(r.Context(),
-					`SELECT auction_id FROM public.auctions WHERE listing_id = $1`, listingID,
-				).Scan(&auctionID)
-			}
-			if auctionID != 0 {
-				var winningBidID *int64
-				if err := tx.QueryRow(r.Context(),
-					`SELECT winning_bid_id FROM public.auctions WHERE auction_id = $1 FOR UPDATE`,
-					auctionID,
-				).Scan(&winningBidID); err != nil && err != pgx.ErrNoRows {
-					http.Error(w, "Could not lock auction", http.StatusInternalServerError)
-					return
-				}
-				if winningBidID != nil {
-					if _, err := tx.Exec(r.Context(),
-						`UPDATE public.bids SET bid_status = 'RESERVE_NOT_MET' WHERE bid_id = $1`,
-						*winningBidID,
-					); err != nil {
-						http.Error(w, "Could not close auction bid", http.StatusInternalServerError)
-						return
-					}
-				}
-				if _, err := tx.Exec(r.Context(), `
-					UPDATE public.auctions
-					SET status = 'ENDED', winner_id = NULL, winning_bid_id = NULL, closed_at = NOW()
-					WHERE auction_id = $1 AND status IN ('SCHEDULED','ACTIVE')
-				`, auctionID); err != nil {
-					http.Error(w, "Could not stop auction", http.StatusInternalServerError)
-					return
-				}
-			}
-			tag, err := tx.Exec(r.Context(),
-				`UPDATE public.listings SET status = 'SUSPENDED', updated_at = NOW()
-				 WHERE listing_id = $1 AND status IN ('DRAFT','PUBLISHED','ACTIVE')`,
-				listingID,
-			)
-			if err != nil {
-				http.Error(w, "Could not suspend listing", http.StatusInternalServerError)
+			if err := suspendListing(r.Context(), tx, listingID, auctionID); err == errListingNotSuspendable {
+				http.Error(w, err.Error(), http.StatusConflict)
 				return
-			}
-			if tag.RowsAffected() == 0 {
-				http.Error(w, "Listing cannot be suspended in its current state", http.StatusConflict)
+			} else if err != nil {
+				http.Error(w, "Could not suspend listing", http.StatusInternalServerError)
 				return
 			}
 
@@ -507,4 +470,109 @@ func AdminReviewReportHandler(w http.ResponseWriter, r *http.Request) {
 		"report":  report,
 		"action":  request.Action,
 	})
+}
+
+var errListingNotSuspendable = errors.New("Listing cannot be suspended in its current state")
+
+// suspendListing ends the listing's running auction without a winner and marks the listing SUSPENDED.
+// auctionID may be 0; it is looked up from the listing.
+func suspendListing(ctx context.Context, tx pgx.Tx, listingID, auctionID int64) error {
+	if auctionID == 0 {
+		_ = tx.QueryRow(ctx, `SELECT auction_id FROM public.auctions WHERE listing_id = $1`, listingID).Scan(&auctionID)
+	}
+	if auctionID != 0 {
+		var winningBidID *int64
+		if err := tx.QueryRow(ctx,
+			`SELECT winning_bid_id FROM public.auctions WHERE auction_id = $1 FOR UPDATE`, auctionID,
+		).Scan(&winningBidID); err != nil && err != pgx.ErrNoRows {
+			return err
+		}
+		if winningBidID != nil {
+			if _, err := tx.Exec(ctx,
+				`UPDATE public.bids SET bid_status = 'RESERVE_NOT_MET' WHERE bid_id = $1`, *winningBidID); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE public.auctions
+			SET status = 'ENDED', winner_id = NULL, winning_bid_id = NULL, closed_at = NOW()
+			WHERE auction_id = $1 AND status IN ('SCHEDULED','ACTIVE')
+		`, auctionID); err != nil {
+			return err
+		}
+	}
+	tag, err := tx.Exec(ctx,
+		`UPDATE public.listings SET status = 'SUSPENDED', updated_at = NOW()
+		 WHERE listing_id = $1 AND status IN ('DRAFT','PUBLISHED','ACTIVE')`, listingID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errListingNotSuspendable
+	}
+	return nil
+}
+
+// AdminListingsHandler returns every listing in every status for the admin dashboard.
+func AdminListingsHandler(w http.ResponseWriter, r *http.Request) {
+	listListings(w, r, `TRUE`)
+}
+
+// AdminSuspendListingHandler suspends a listing directly, records the moderation action and tells the seller.
+func AdminSuspendListingHandler(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value(userIDKey).(int64)
+	listingID, ok := pathID(r)
+	if !ok {
+		http.Error(w, "Invalid listing ID", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := DB.Begin(r.Context())
+	if err != nil {
+		http.Error(w, "Could not start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var sellerUserID int64
+	err = tx.QueryRow(r.Context(), `
+		SELECT sp.user_id
+		FROM public.listings l
+		INNER JOIN public.seller_profiles sp ON sp.seller_id = l.seller_id
+		WHERE l.listing_id = $1
+		FOR UPDATE OF l
+	`, listingID).Scan(&sellerUserID)
+	if err == pgx.ErrNoRows {
+		http.Error(w, "Listing not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Could not load listing", http.StatusInternalServerError)
+		return
+	}
+
+	if err := suspendListing(r.Context(), tx, listingID, 0); err == errListingNotSuspendable {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	} else if err != nil {
+		http.Error(w, "Could not suspend listing", http.StatusInternalServerError)
+		return
+	}
+	if _, err := tx.Exec(r.Context(), `
+		INSERT INTO public.moderation_actions (admin_user_id, target_user_id, listing_id, action_type, reason)
+		VALUES ($1, $2, $3, 'SUSPEND_LISTING', 'Suspended from the admin dashboard')
+	`, adminID, sellerUserID, listingID); err != nil {
+		http.Error(w, "Could not record moderation action", http.StatusInternalServerError)
+		return
+	}
+	if err := notify(r.Context(), tx, sellerUserID, "MODERATION_WARNING", "Listing suspended",
+		"An administrator suspended one of your listings.", 0, listingID, 0); err != nil {
+		http.Error(w, "Could not notify seller", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, "Could not suspend listing", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Listing suspended"})
 }

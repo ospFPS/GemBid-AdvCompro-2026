@@ -136,6 +136,7 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	mux.HandleFunc("GET /api/auctions/{id}/bids", ListAuctionBidsHandler)
 	mux.HandleFunc("POST /api/auctions/{id}/bids", AuthMiddleware(PlaceBidHandler))
 	mux.HandleFunc("POST /api/auctions/{id}/close", AuthMiddleware(VerifiedSellerMiddleware(CloseAuctionHandler)))
+	mux.HandleFunc("GET /api/me/bids", AuthMiddleware(MyBidsHandler))
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -316,6 +317,25 @@ func TestAuctionEngineTwoBidderFlow(t *testing.T) {
 	}
 	if closed.Auction.WinningBidID == nil {
 		t.Fatal("expected winning_bid_id after successful auction")
+	}
+
+	myBidsResp := integrationRequest(t, http.MethodGet, server.URL+"/api/me/bids", bidderAToken, nil)
+	requireHTTPStatus(t, "my bids", myBidsResp, http.StatusOK)
+	var myBids []MyBidItem
+	if err := json.Unmarshal(myBidsResp.Body, &myBids); err != nil {
+		t.Fatal(err)
+	}
+	foundMyBid := false
+	for _, b := range myBids {
+		if b.AuctionID == auctionID {
+			foundMyBid = true
+			if b.MyHighestBid != closed.Auction.CurrentPrice || !b.IsWinner || b.AuctionStatus != "ENDED" {
+				t.Fatalf("unexpected my-bids row: %+v", b)
+			}
+		}
+	}
+	if !foundMyBid {
+		t.Fatalf("my bids should include auction %d: %s", auctionID, myBidsResp.Body)
 	}
 
 	if err := DB.QueryRow(

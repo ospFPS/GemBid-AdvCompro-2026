@@ -914,3 +914,59 @@ func CloseDueAuctions(ctx context.Context) {
 		}
 	}
 }
+
+type MyBidItem struct {
+	AuctionID     int64     `json:"auction_id"`
+	ListingID     int64     `json:"listing_id"`
+	GemName       string    `json:"gem_name"`
+	GemType       string    `json:"gem_type"`
+	MyHighestBid  float64   `json:"my_highest_bid"`
+	MyBidStatus   string    `json:"my_bid_status"`
+	CurrentPrice  float64   `json:"current_price"`
+	AuctionStatus string    `json:"auction_status"`
+	EndTime       time.Time `json:"end_time"`
+	IsLeading     bool      `json:"is_leading"`
+	IsWinner      bool      `json:"is_winner"`
+	LastBidTime   time.Time `json:"last_bid_time"`
+	ImageURL      *string   `json:"image_url"`
+}
+
+// MyBidsHandler returns one row per auction the user bid on, with their highest bid.
+func MyBidsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(userIDKey).(int64)
+
+	rows, err := DB.Query(r.Context(), `
+		SELECT * FROM (
+			SELECT DISTINCT ON (a.auction_id)
+				a.auction_id, a.listing_id, g.gem_name, g.gem_type,
+				b.bid_amount, b.bid_status, a.current_price, a.status, a.end_time,
+				COALESCE(a.current_highest_bidder_id = $1, FALSE),
+				COALESCE(a.winner_id = $1, FALSE),
+				b.bid_time, gi.image_url
+			FROM public.bids b
+			INNER JOIN public.auctions a ON a.auction_id = b.auction_id
+			INNER JOIN public.listings l ON l.listing_id = a.listing_id
+			INNER JOIN public.gems g ON g.gem_id = l.gem_id
+			LEFT JOIN public.gem_images gi ON gi.gem_id = g.gem_id AND gi.is_primary
+			WHERE b.bidder_id = $1
+			ORDER BY a.auction_id, b.bid_amount DESC, b.bid_time DESC
+		) mine
+		ORDER BY bid_time DESC
+	`, userID)
+	if err != nil {
+		http.Error(w, "Could not load bids", http.StatusInternalServerError)
+		return
+	}
+	bids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (MyBidItem, error) {
+		var b MyBidItem
+		err := row.Scan(&b.AuctionID, &b.ListingID, &b.GemName, &b.GemType, &b.MyHighestBid,
+			&b.MyBidStatus, &b.CurrentPrice, &b.AuctionStatus, &b.EndTime, &b.IsLeading,
+			&b.IsWinner, &b.LastBidTime, &b.ImageURL)
+		return b, err
+	})
+	if err != nil {
+		http.Error(w, "Could not read bids", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, bids)
+}

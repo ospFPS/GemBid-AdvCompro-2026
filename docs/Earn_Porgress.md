@@ -1,14 +1,15 @@
 # GemBid — Earn Progress + Frontend API Guide
 
-**Date:** 5 October 2026
-**Branch:** `Earn_refactor` (from `main` @ `0ea8465`)
+**Updated:** 14 October 2026 (final check-up on `Earn_TTB`, see section 3.7)
+**First written:** 5 October 2026 (backend cleanup, merged to `main`)
 
-This document has two parts:
+This document has three parts:
 
-1. **Progress** — what changed in the backend this round (a cleanup, no API change).
+1. **Progress** — the backend cleanup (5 Oct).
 2. **Frontend API Guide** — everything the frontend team needs to call the backend.
+3. **Frontend Integration** (13 Oct) — William's + Ryu's frontend merged and wired to the backend, how to run the whole site.
 
-> **Frontend team:** jump to [Part 2](#part-2--frontend-api-guide).
+> **Frontend team:** start with [Part 3](#part-3--frontend-integration-13-october-2026), then use [Part 2](#part-2--frontend-api-guide) as the reference.
 
 ---
 
@@ -90,6 +91,8 @@ Static checks: `go build`, `go vet`, `gofmt` ✅
 | Interactive docs (Swagger) | `<backend>/docs` |
 
 ### ⚠️ Use a Next.js proxy — the backend does not send CORS headers
+
+> ✅ Already set up in `Frontend/next.config.js` (13 Oct). This section explains why.
 
 A browser `fetch` from `localhost:3000` straight to `:8080` **will be blocked**: the
 backend answers the CORS preflight with `405`. Proxy instead, so the browser only
@@ -246,6 +249,7 @@ and cannot be deleted while a listing references it (`409`).
 | Method | Path | Auth | Body | Response |
 |---|---|---|---|---|
 | GET | `/api/listings` | 🌐 | | `ListingItem[]` (only `PUBLISHED`/`ACTIVE`) |
+| GET | `/api/seller/listings` | 💎 | | `ListingItem[]`: **my** listings in every status, drafts included |
 | GET | `/api/listings/{id}` | 🌐 | | `Listing` |
 | POST | `/api/listings` | 💎 | `{gem_id}` | `201 {message, listing}` (status `DRAFT`) |
 | PUT | `/api/listings/{id}/publish` | 💎 owner | see below | `{message, listing}` |
@@ -257,7 +261,11 @@ Publish body:
 
 ```ts
 type ListingItem = { listing_id: number; gem_id: number; gem_name: string; gem_type: string;
-  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null };
+  sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null;
+  // added 13 Oct, so a store card needs no extra calls:
+  description: string | null; seller_id: number; shop_name: string;
+  auction_id: number | null; current_price: number | null;   // auction fields are null for fixed price
+  minimum_increment: number | null; end_time: string | null };
 type Listing = { listing_id: number; gem_id: number; seller_id: number;
   sale_type: "FIXED_PRICE" | "AUCTION" | null; status: ListingStatus; fixed_price: number | null;
   created_at: string; published_at: string | null; updated_at: string;
@@ -274,6 +282,7 @@ auction) returns `403` with an upgrade message. Show an "Upgrade to PRO" button.
 | GET | `/api/auctions` | 🌐 | | `AuctionItem[]` (`SCHEDULED` + `ACTIVE`, active first) |
 | GET | `/api/auctions/{id}` | 🌐 | | `Auction` |
 | GET | `/api/auctions/{id}/bids` | 🌐 | | `Bid[]` (newest first) |
+| GET | `/api/me/bids` | 👤 | | `MyBid[]`: one row per auction I bid on (see below) |
 | POST | `/api/auctions` | 💎 owner | see below | `201 {message, auction}` |
 | POST | `/api/auctions/{id}/bids` | 👤 | `{bid_amount}` | `201 {message, bid, current_price, next_minimum_bid}` |
 | POST | `/api/auctions/{id}/close` | 💎 owner | | `{message, auction, order_id?}` |
@@ -301,6 +310,13 @@ Bidding rules:
 **Closing is automatic.** The backend closes ended auctions every 30 seconds. If the reserve is met, the winner gets a `PENDING_PAYMENT` order and an `AUCTION_WON` notification; otherwise the listing becomes `UNSOLD`. The `close` endpoint is only a manual shortcut.
 
 For a live view, poll `GET /api/auctions/{id}` every few seconds. There is no websocket.
+
+```ts
+type MyBid = { auction_id: number; listing_id: number; gem_name: string; gem_type: string;
+  my_highest_bid: number; my_bid_status: string; current_price: number;
+  auction_status: "SCHEDULED" | "ACTIVE" | "ENDED"; end_time: string;
+  is_leading: boolean; is_winner: boolean; last_bid_time: string };
+```
 
 ```ts
 type Auction = { auction_id: number; listing_id: number; starting_price: number;
@@ -485,10 +501,237 @@ type ListingStatus = "DRAFT" | "PUBLISHED" | "ACTIVE" | "SOLD" | "UNSOLD" | "EXP
 
 | Gap | Workaround for now |
 |---|---|
-| No "my listings" endpoint for sellers; `GET /api/listings` only shows published or active ones | Keep the `listing_id` from create/publish responses |
 | `GET /api/gems` returns every seller's gems | Filter by `seller_id` on the frontend |
 | `GET /api/listings/{id}` also returns `DRAFT` listings to anyone | Don't link to drafts publicly |
 | No search, filters or pagination on lists | Filter on the frontend (lists are small) |
-| No image upload | Placeholder images |
-| No CORS | Use the Next.js proxy (section 2.1) |
+| Photos are stored as data URLs in the database (fine for a demo) | Move to object storage if many large photos are uploaded |
+| No CORS | Next.js proxy, already in `next.config.js` |
+| Orders don't include the gem name | Look up `/api/listings/{id}` → `/api/gems/{gem_id}` (done by `gemForListing` in `app/lib/api.js`) |
+| No buyer name on seller orders | Show `Buyer #id` |
+| No seller analytics, no edit-listing endpoint | Those pages stay on mock data |
 | No refresh token (24h expiry) | Re-login on `401` |
+
+---
+
+# Part 3 — Frontend Integration (13 October 2026)
+
+## 3.1 What happened
+
+- **Branches:** William's `william-frontend` already contains all of Ryu's `Frontend-Frien` work, so merging it brought in both. `Earn_TTB` was first brought up to date with `main`, then the frontend merged with no conflicts.
+- **Before:** the frontend was a UI prototype (20 pages, hard-coded data, login did nothing, no API calls).
+- **Now:** the core demo flows run on the real backend. Page markup and CSS were kept; only the data and the button handlers changed.
+
+| Page | Status | Backend calls |
+|---|---|---|
+| Login / Sign up | ✅ live (username login) | `POST /api/login`, `POST /api/register` |
+| Store, Item, Cart | ✅ live (real listings, baht prices) | `GET /api/listings` |
+| Buy now / Cart checkout | ✅ live → goes to the order page | `POST /api/listings/{id}/buy` |
+| Bid | ✅ live (auto-refresh every 5s) | `GET /api/auctions/{id}`, `POST /api/auctions/{id}/bids` |
+| My Purchases, Order details | ✅ live (pay, cancel, confirm delivery, tracking) | `/api/orders...` |
+| Notifications | ✅ live (mark read / all read, links) | `/api/notifications...` |
+| Profile | ✅ live (edit, change password, PRO upgrade, log out) | `/api/me`, `/api/subscriptions/...` |
+| Become a Seller | ✅ live (shows status after applying) | `/api/seller/status`, `/api/seller/apply` |
+| Create Listing | ✅ live (fixed price or auction with duration) | gems → listings → publish / auctions |
+| Seller Orders | ✅ live (mark as shipped) | `/api/orders?as=seller`, `PUT /api/orders/{id}/ship` |
+| My Listings, View listing | ✅ live | `GET /api/seller/listings` (new) |
+| My Bids | ✅ live | `GET /api/me/bids` (new) |
+| Seller Analytics, My Auctions, Edit listing, Home | ⬜ still mock | no matching backend endpoints yet |
+
+**Shared code:**
+- `app/lib/api.js`: the browser API helper (adds the token, plain-text errors, redirects to `/login` on 401), plus `formatTHB`, `gemImage`, `toPurchase` and `toMyListing`.
+- `app/lib/server.js`: `serverApi()` for server components. It renders per request, never at build time.
+- `app/AccountNav.js`: the store header (shows seller links once the seller is verified).
+
+**Images:** Create Listing uploads the seller's photos. They are resized in the browser and stored in `gem_images` through `POST /api/gems/{id}/images`, and the first photo is the main one. Gems with no photo (including the seeded demo data) show a stock photo for their gem type.
+
+**Fixed along the way:** `become-seller` failed `next build` (`useSearchParams` needs a `<Suspense>` boundary). `npm run dev` doesn't catch this, so run `npm run build` before pushing.
+
+## 3.2 Running the whole site
+
+```bash
+# on the server (or any machine with Docker), in the repo root with .env present
+docker compose up -d --build
+```
+
+| Service | URL |
+|---|---|
+| Website (public, ngrok) | `https://angular-snorkel-passive.ngrok-free.dev` |
+| Website (Tailscale) | `http://thalamus:3000` |
+| Backend API + Swagger (Tailscale only) | `http://thalamus:8080`, Swagger at `/docs` |
+
+The frontend container proxies `/api/*` to the backend container (`BACKEND_URL=http://backend:8080`, set in `docker-compose.yml`).
+
+**Local frontend development** against the team server:
+
+```bash
+cd Frontend
+BACKEND_URL=http://thalamus:8080 npm run dev
+```
+
+> The server disk is small (11 GB). After a rebuild, run `docker builder prune -af` to free the build cache. A full disk made one deploy fail on 13 Oct.
+
+## 3.3 Verification (13 Oct)
+
+- All 8 backend integration tests pass, plus new checks for `GET /api/seller/listings`, `GET /api/me/bids` and the new listing fields.
+- `next build` passes.
+- On thalamus, every page returns 200 on `:3000`. Unknown items return 404, and `/api` is proxied.
+- A full demo run through the site's `/api` proxy passed, checking every step:
+  - A seller applies and an admin approves.
+  - The seller creates 3 fixed-price listings and 2 auctions.
+  - A buyer does Buy Now → pay → the seller ships → the buyer confirms delivery.
+  - Two users bid: a too-low bid gets 409, a seller self-bid gets 403, and the outbid notification is sent.
+  - Notifications arrive for both sides.
+- The rendered store and item pages show the real gems, shop name, baht prices and photos.
+
+## 3.4 Public access (ngrok)
+
+- The ngrok endpoint now points at the **website (port 3000)** instead of the backend. The website proxies `/api/*` to the backend, so the one public URL serves both the site and the API.
+- Swagger (`/docs`) is no longer public; use `http://thalamus:8080/docs` over Tailscale.
+- ngrok now runs as the `ayase` user (not root), so it can be restarted without sudo:
+  ```bash
+  pkill -f "ngrok start --all"
+  setsid nohup ngrok start --all --config=$HOME/.config/ngrok/ngrok.yml >/tmp/ngrok.log 2>&1 < /dev/null &
+  ```
+  If it exits with `ERR_NGROK_334`, the old connection hasn't been released yet; wait a few seconds and start it again.
+- The previous config (pointing at port 8080) is saved as `~/.config/ngrok/ngrok.yml.bak-8080`.
+- Free ngrok shows a one-time "You are about to visit…" page; click **Visit Site**.
+
+## 3.5 Testing the site
+
+**Demo accounts** (reset 14 Oct by `backend/db/seed_demo.py`; one shared password, ask Earn, it's not stored in the repo):
+
+| Username | Role | Data |
+|---|---|---|
+| `admin` | Admin | Uses the `/admin` dashboard |
+| `siam_gems` | Seller "Siam Gem House" (PRO) | 9 listings incl. live auctions, a draft, sold items; orders to ship |
+| `chanthaburi_jewels` | Seller "Chanthaburi Jewels" (FREE, at the 5-listing limit) | Fixed-price items, one auction with bids, one unpaid order |
+| `lanna_stones` | Seller application **pending** | Approve it in `/admin` |
+| `alice` | Buyer | Delivered order, won the Blue Topaz auction (order to pay), leads the ruby auction, reported a listing |
+| `bob` | Buyer | Shipped order (confirm delivery), unpaid order, outbid on the ruby |
+| `chai` | Buyer | Paid order waiting for shipping, outbid on the emerald |
+
+**Test scenarios:**
+
+1. **Buy:** as a buyer, open a "Buy now" item → **Buy now** → pay (simulated) → the seller marks it shipped in **Seller Orders** → the buyer clicks **I received my gem**. Check **Notifications** on both accounts.
+2. **Bid:** two buyers bid on an auction; the outbid user gets a notification, and **My Bids** shows Winning or Outbid. For a quick end-to-end test, create an auction with the **"5 minutes (demo)"** duration; about 30 seconds after it ends, the winner gets an order to pay in **My Purchases**.
+3. **Sell:** as `demo_seller`, use **Create Listing** (fixed price or auction) or **Save Draft**, then check **My Listings**. The FREE plan allows 5 live listings; after that, **Profile → Upgrade to PRO**.
+4. **Become a seller:** sign up → **Become a Seller** → an admin approves it in Swagger (below) → the seller links appear in the header.
+5. **Profile:** edit details, change password (needs the current one), log out.
+
+**Admin actions:** log in as `admin` → **Admin Dashboard** in the store header (`/admin`). Swagger (`http://thalamus:8080/docs`) still works for anything else. Any account can be made an admin with this SQL:
+`UPDATE users SET role = 'ADMIN' WHERE username = '...';`
+
+**Expected gaps (not bugs):**
+- Seller Analytics, My Auctions, Edit Listing and Home still show mock data.
+- Gems without an uploaded photo show a stock photo for their gem type.
+- Seller orders show buyers as "Buyer #id".
+
+**Not merged to `main` yet:** more team code is coming. It will be merged into `Earn_TTB` and tested the same way before anything goes to `main`.
+
+## 3.6 Second integration (14 October 2026)
+
+`FrontendForRealThisTime` (contains all of William's and Frien's work, including Frien's new admin dashboard and the store's Buy now / Bid filter) was merged into `Earn_TTB`.
+
+**Problems found and how they were handled:**
+
+| Problem | Fix |
+|---|---|
+| Admin dashboard only edited a browser-local copy of listings (`localStorage`), not the database | Rewired to the backend; layout and styles kept |
+| Admin dashboard imported `listings.js` (server-only now), so it would break `next build` | Uses the browser API helper instead |
+| No access check; "Admin dashboard" link shown to everyone | Page checks `role = ADMIN`; the link only appears for admins (backend enforces it too) |
+| Empty `app/api/admin-api/[...path]/route.js` could intercept the `/api` proxy | Deleted (it was empty) |
+| `store`, `item`, `listings.js`, `.gitignore` conflicted with the live-data wiring | Merged: their new filter and item layout on top of live data and baht prices |
+
+**Admin dashboard (`/admin`, admin only):**
+- Platform stats: users, live listings, pending sellers, paid orders, sales and PRO members.
+- Seller applications: approve or reject.
+- All listings: search, type, status and sort filters, plus **Suspend**, which stops a running auction and notifies the seller.
+- Pending reports: resolve with an action (warn user, suspend listing, suspend seller) or reject.
+
+**New backend endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/admin/listings` 🛡️ | Every listing in every status |
+| `POST /api/gems/{id}/images` 💎 owner | `{image_url: "data:image/..."}` (< 2 MB); first image is the main photo. `image_url` is returned on gems, listings and my-bids |
+| `PUT /api/admin/listings/{id}/suspend` 🛡️ | Suspends the listing, records a moderation action and notifies the seller. Shares the suspend logic with report review |
+
+**Database reset:** all data was wiped (schema kept, IDs restart at 1) and reseeded with `backend/db/seed_demo.py`. To reset again on the server:
+
+```bash
+cd /srv/Adv_Compro_Project/GemBid-AdvCompro-2026
+set -a; . ./.env; set +a
+python3 backend/db/seed_demo.py --wipe   # DELETES ALL DATA, then reseeds (~3 min)
+```
+
+**Still not covered by the frontend:**
+- Seller Analytics, My Auctions and Edit Listing / Relist still show mock data.
+- There's no "Report" button for users (reports can only be created through the API).
+- There are no admin user-management or bid-history pages.
+
+## 3.7 Final check-up (14 October 2026)
+
+Run on `Earn_TTB` @ `01a53f6`, deployed on thalamus.
+
+**Backend**
+
+| Check | Result |
+|---|---|
+| `gofmt`, `go build`, `go vet` | ✅ clean |
+| Integration tests against the database (8 suites: auction engine, auto-closer, quota concurrency, full API end-to-end, migration 020, orders/payment/shipping + admin suspend + photo upload, report moderation, security) | ✅ all pass, test data cleaned up |
+
+**Frontend**
+
+| Check | Result |
+|---|---|
+| `next build` (production) | ✅ 20 pages |
+| Every page on `http://thalamus:3000` (22 URLs incl. filters, item, bid, order and listing detail) | ✅ 22/22 load |
+| Same 22 URLs on the public ngrok URL | ✅ 22/22 load |
+| Unknown item | ✅ 404 page |
+
+**Live behaviour** (through the public URL, as the real accounts)
+
+| Check | Result |
+|---|---|
+| All 7 demo accounts log in; wrong password rejected | ✅ |
+| No token → 401; buyer → 403 on seller and admin endpoints; seller can't buy own listing; buyer can't see another buyer's order | ✅ |
+| Store: live listings with shop name and description; Buy now / Bid filter | ✅ |
+| Admin: analytics, seller applications, all listings (incl. drafts and sold), reports | ✅ |
+| Buyers: orders, bids and notifications load; sellers: seller orders and My Listings | ✅ |
+| FREE seller at the 5-listing limit, PRO seller unlimited | ✅ |
+| Photo upload: owner allowed, other seller blocked, photo shown (temporary gem, deleted after) | ✅ |
+
+**Server**
+- Both containers are up with 0 restarts and no errors in the logs.
+- The disk is at 40% (21 GB).
+- ngrok runs as `ayase`, pointing at the website.
+
+**Demo data now** (changed by hand testing since the seed):
+- `lanna_stones` was approved through the admin dashboard.
+- `alice` applied as a seller (shop "asd") and was approved.
+- A few extra listings were created.
+
+To go back to the clean seed, run `backend/db/seed_demo.py --wipe` (section 3.6). That deletes everything.
+
+**Cleanup this round:** removed a stray compiled `.pyc` file, the unused `data/purchases.js` mock, `deploy.sh` (its `git pull` needed the SSH passphrase; deploys use `docker compose up -d --build` instead), an unused helper, and two formatting wrappers.
+
+**Known gaps (unchanged):**
+- Seller Analytics, My Auctions and Edit Listing / Relist are still mock.
+- There's no user "Report" button.
+- There are no admin user-management or bid-history pages.
+- Seller orders show `Buyer #id`.
+
+**Status:** ready for review. Not merged to `main`.
+
+## 3.8 Database cleared (14 October 2026)
+
+All data was wiped and reseeded with `python3 backend/db/seed_demo.py --wipe --minimal`. The database now holds only:
+
+| What | Details |
+|---|---|
+| `admin` | Admin account |
+| `siam_gems` | Verified seller "Siam Gem House" (needed to own the listings) |
+| 2 fixed-price listings | Royal Blue Sapphire ฿12,500 · Diamond Solitaire Ring ฿45,000 |
+| 2 auctions (7 days, no bids) | Pigeon Blood Ruby from ฿5,000 (reserve ฿6,000) · Colombian Emerald from ฿7,000 |
+
+There are no buyers, bids, orders, notifications or reports. The demo accounts in section 3.5 (alice, bob, chai and the others) no longer exist; sign up new ones on the site, or run `seed_demo.py --wipe` for the full demo set.

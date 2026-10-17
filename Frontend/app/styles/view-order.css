@@ -1,0 +1,71 @@
+/* =========================
+   View Order Page
+   ========================= */
+.view-order-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.view-order-home button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    margin-bottom: 1.2rem;
+}
+.view-order-home button:hover {
+    background-color: #eeeeee;
+}
+.view-order-back-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.view-order-back-link:hover {
+    text-decoration: underline;
+}
+.view-order-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.view-order-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.order-details,
+.order-progress {
+    width: min(100%, 900px);
+    margin: 0 auto 1rem;
+    padding: 3rem;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    line-height: 2rem;
+}
+.order-details h2,
+.order-progress h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+.order-details p,
+.order-progress p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.order-progress p.completed {
+    color: darkgreen;
+}
+.order-progress p.not-completed {
+    color: #666666;
+}
+.order-details img {
+    width: 450px;
+    height: 425px;
+    object-fit: cover;
+}

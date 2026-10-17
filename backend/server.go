@@ -42,6 +42,8 @@ func Run() {
 	mux.HandleFunc("POST /api/seller/apply", AuthMiddleware(SellerApplyHandler))
 
 	mux.HandleFunc("GET /api/seller/status", AuthMiddleware(SellerStatusHandler))
+	mux.HandleFunc("GET /api/seller/listings", AuthMiddleware(VerifiedSellerMiddleware(MySellerListingsHandler)))
+	mux.HandleFunc("GET /api/me/bids", AuthMiddleware(MyBidsHandler))
 
 	mux.HandleFunc("GET /api/admin/seller-applications", AuthMiddleware(AdminMiddleware(AdminSellerApplicationsHandler)))
 
@@ -55,6 +57,7 @@ func Run() {
 
 	mux.HandleFunc("PUT /api/gems/{id}", AuthMiddleware(VerifiedSellerMiddleware(UpdateGemHandler)))
 
+	mux.HandleFunc("POST /api/gems/{id}/images", AuthMiddleware(VerifiedSellerMiddleware(AddGemImageHandler)))
 	mux.HandleFunc("DELETE /api/gems/{id}", AuthMiddleware(VerifiedSellerMiddleware(DeleteGemHandler)))
 
 	mux.HandleFunc("POST /api/listings", AuthMiddleware(VerifiedSellerMiddleware(CreateListingHandler)))
@@ -102,6 +105,8 @@ func Run() {
 	mux.HandleFunc("GET /api/admin/reports", AuthMiddleware(AdminMiddleware(AdminListReportsHandler)))
 	mux.HandleFunc("PUT /api/admin/reports/{id}", AuthMiddleware(AdminMiddleware(AdminReviewReportHandler)))
 	mux.HandleFunc("GET /api/admin/moderation-actions", AuthMiddleware(AdminMiddleware(AdminListModerationActionsHandler)))
+	mux.HandleFunc("GET /api/admin/listings", AuthMiddleware(AdminMiddleware(AdminListingsHandler)))
+	mux.HandleFunc("PUT /api/admin/listings/{id}/suspend", AuthMiddleware(AdminMiddleware(AdminSuspendListingHandler)))
 
 	StartAuctionCloser()
 	StartEmailWorker()

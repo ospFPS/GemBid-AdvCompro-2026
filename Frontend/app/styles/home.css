@@ -1,0 +1,106 @@
+/* =========================
+   User Home Page
+   ========================= */
+
+.user-home {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f4f3f5;
+}
+
+/* Header */
+
+.home-header {
+  background-color: white;
+  border-bottom: 1px solid #ccc;
+  padding: 20px;
+}
+
+.home-header h1 {
+  margin: 0 0 15px 0;
+}
+
+.home-header nav {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.home-header nav a {
+    color: black;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.home-header nav a:hover {
+  text-decoration: underline;
+}
+.home-header nav a.Become-seller {
+    color: #9b7545;
+    font-weight: bold;
+}
+
+/* Main content */
+.home-content {
+    padding: 40px;
+    max-width: 1400px;
+    margin: auto;
+}
+.home-content p {
+    font-size: 1.2rem;
+}
+.home-content h3 {
+    font-size: 1.5rem;
+    margin-top: 0;
+}
+
+.welcome-section {
+    background-color: rgb(255, 255, 255);
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 1px solid #b5b5b5;
+}
+
+.welcome-section h2 {
+    font-size: 3rem;
+    margin-top: 0;
+}
+
+/* Navigation cards */
+
+.home-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.home-card {
+  display: block;
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 25px;
+  text-decoration: none;
+  color: black;
+  min-height: 120px;
+}
+
+.home-card:hover {
+    border: 2px solid #b5b5b5;
+    border-color: black;
+}
+
+.home-card h3 {
+  margin-top: 0;
+}
+
+.home-card p {
+  color: #555;
+}
+
+/* Become seller */
+.seller-card {
+  border: 2px solid #9b7545;
+}
+
+.seller-card:hover {
+    border: 2.5px solid #d9984d;
+}

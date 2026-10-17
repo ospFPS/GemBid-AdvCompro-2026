@@ -1,0 +1,105 @@
+/* =========================
+   Notifications Page
+   ========================= */
+.notifications-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+}
+.notifications-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+.notifications-home-link:hover {
+    text-decoration: underline;
+}
+.notifications-page > h1 {
+    margin-bottom: 2rem;
+    font-size: 3rem;
+}
+.notification-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.notification-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+.notification-filters button.active {
+    background-color: #cccccc;
+}
+.notification-filters button:hover {
+    background-color: #eeeeee;
+}
+.mark-all-read-button {
+    padding: 0.4rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #ffa9a9;
+    border: 1px solid #000000;
+}
+.mark-all-read-button:hover {
+    background-color: #f8cfcf;
+}
+.notifications-sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1rem 0;
+    background-color: #f4f3f5;
+}
+.notifications-list {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+.notification-message {
+    padding: 4rem;
+    font-size: 2rem;
+}
+.notification-card {
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+.notification-card h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+.notification-card p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+.notification-time {
+    color: #666666;
+    font-size: 1.2rem !important;
+}
+.notification-card a{
+    display: inline-block;
+    margin-bottom: 1.2rem;
+    color: #6060ff;
+    font-size: 1.1rem;
+    text-decoration: underline;
+}
+.notification-card a:hover {
+    text-decoration: none;
+}
+.notification-card button {
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    font-size: 1.2rem;
+}
+.notification-card button:hover {
+    background-color: #eeeeee;
+}

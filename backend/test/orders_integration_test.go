@@ -79,6 +79,9 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	})
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/listings", ListListingsHandler)
+	mux.HandleFunc("POST /api/gems/{id}/images", AuthMiddleware(VerifiedSellerMiddleware(AddGemImageHandler)))
+	mux.HandleFunc("GET /api/seller/listings", AuthMiddleware(VerifiedSellerMiddleware(MySellerListingsHandler)))
 	mux.HandleFunc("POST /api/listings/{id}/buy", AuthMiddleware(BuyNowHandler))
 	mux.HandleFunc("GET /api/orders/{id}", AuthMiddleware(GetOrderHandler))
 	mux.HandleFunc("POST /api/orders/{id}/pay", AuthMiddleware(PayOrderHandler))
@@ -90,6 +93,8 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 	mux.HandleFunc("GET /api/subscriptions/me", AuthMiddleware(MySubscriptionHandler))
 	mux.HandleFunc("POST /api/subscriptions/upgrade", AuthMiddleware(UpgradeSubscriptionHandler))
 	mux.HandleFunc("GET /api/admin/analytics", AuthMiddleware(AdminMiddleware(AdminAnalyticsHandler)))
+	mux.HandleFunc("GET /api/admin/listings", AuthMiddleware(AdminMiddleware(AdminListingsHandler)))
+	mux.HandleFunc("PUT /api/admin/listings/{id}/suspend", AuthMiddleware(AdminMiddleware(AdminSuspendListingHandler)))
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
@@ -112,6 +117,40 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 			t.Fatal(err)
 		}
 		return d.Order.Status
+	}
+
+	// --- Listing lists used by the frontend ---
+	findListing := func(body []byte, id int64) *ListingListItem {
+		t.Helper()
+		var items []ListingListItem
+		if err := json.Unmarshal(body, &items); err != nil {
+			t.Fatal(err)
+		}
+		for i := range items {
+			if items[i].ListingID == id {
+				return &items[i]
+			}
+		}
+		return nil
+	}
+	if item := findListing(call("GET", "/api/listings", "", nil, http.StatusOK), listingA); item == nil ||
+		item.ShopName == "" || item.SellerID != sellerID || item.AuctionID != nil {
+		t.Fatalf("public listing %d missing seller details: %+v", listingA, item)
+	}
+	if findListing(call("GET", "/api/seller/listings", seller, nil, http.StatusOK), listingA) == nil {
+		t.Fatalf("seller listings should include %d", listingA)
+	}
+	call("GET", "/api/seller/listings", buyer, nil, http.StatusForbidden)
+
+	// --- Gem image upload ---
+	imagePath := fmt.Sprintf("/api/gems/%d/images", gemID)
+	pixel := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+	call("POST", imagePath, buyer, map[string]any{"image_url": pixel}, http.StatusForbidden)
+	call("POST", imagePath, seller, map[string]any{"image_url": "https://example.com/x.png"}, http.StatusBadRequest)
+	call("POST", imagePath, seller, map[string]any{"image_url": pixel}, http.StatusCreated)
+	if item := findListing(call("GET", "/api/listings", "", nil, http.StatusOK), listingA); item == nil ||
+		item.ImageURL == nil || *item.ImageURL != pixel {
+		t.Fatalf("listing %d should show the uploaded image: %+v", listingA, item)
 	}
 
 	call("POST", fmt.Sprintf("/api/listings/%d/buy", listingA), seller, nil, http.StatusForbidden)
@@ -216,6 +255,16 @@ func TestOrderPaymentShippingFlow(t *testing.T) {
 			t.Fatalf("analytics missing %q: %v", key, report)
 		}
 	}
+
+	// --- Admin listing moderation ---
+	suspendPath := fmt.Sprintf("/api/admin/listings/%d/suspend", listingB)
+	call("PUT", suspendPath, buyer, nil, http.StatusForbidden)
+	call("PUT", suspendPath, admin, nil, http.StatusOK)
+	call("PUT", suspendPath, admin, nil, http.StatusConflict)
+	if item := findListing(call("GET", "/api/admin/listings", admin, nil, http.StatusOK), listingB); item == nil || item.Status != "SUSPENDED" {
+		t.Fatalf("admin listings should show %d as SUSPENDED: %+v", listingB, item)
+	}
+	_, _ = DB.Exec(ctx, `DELETE FROM public.moderation_actions WHERE listing_id = $1`, listingB)
 
 	t.Logf("PASS order=%d delivered, order=%d cancelled, buyer=%d PRO", order.OrderID, orderB.OrderID, buyerID)
 }

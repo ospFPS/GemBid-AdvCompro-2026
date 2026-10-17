@@ -50,14 +50,15 @@ func cleanAndValidateGemRequest(request *CreateGemRequest) string {
 }
 
 const gemColumns = `gem_id, seller_id, gem_name, gem_type, carat, length, width, height,
-	shape, color, clarity, origin, treatment, description, created_at, updated_at`
+	shape, color, clarity, origin, treatment, description, created_at, updated_at,
+	(SELECT gi.image_url FROM public.gem_images gi WHERE gi.gem_id = gems.gem_id AND gi.is_primary)`
 
 func scanGem(row pgx.Row, gem *GemResponse) error {
 	return row.Scan(
 		&gem.GemID, &gem.SellerID, &gem.GemName, &gem.GemType,
 		&gem.Carat, &gem.Length, &gem.Width, &gem.Height,
 		&gem.Shape, &gem.Color, &gem.Clarity, &gem.Origin,
-		&gem.Treatment, &gem.Description, &gem.CreatedAt, &gem.UpdatedAt,
+		&gem.Treatment, &gem.Description, &gem.CreatedAt, &gem.UpdatedAt, &gem.ImageURL,
 	)
 }
 
@@ -297,4 +298,52 @@ func DeleteGemHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Gem deleted successfully",
 	})
+}
+
+type AddGemImageRequest struct {
+	ImageURL string `json:"image_url"`
+}
+
+// ponytail: images live in gem_images.image_url as data URLs (resized in the browser);
+// move them to object storage if they grow past demo size.
+const maxImageURLBytes = 2_000_000
+
+// AddGemImageHandler stores an image for a seller's own gem; the first image becomes the primary one.
+func AddGemImageHandler(w http.ResponseWriter, r *http.Request) {
+	sellerID, _ := r.Context().Value(sellerIDKey).(int64)
+	gemID, ok := pathID(r)
+	if !ok {
+		http.Error(w, "Invalid gem ID", http.StatusBadRequest)
+		return
+	}
+
+	var request AddGemImageRequest
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	if !strings.HasPrefix(request.ImageURL, "data:image/") || len(request.ImageURL) > maxImageURLBytes {
+		http.Error(w, "image_url must be an image data URL under 2 MB", http.StatusBadRequest)
+		return
+	}
+
+	var imageID int64
+	var isPrimary bool
+	err := DB.QueryRow(r.Context(), `
+		INSERT INTO public.gem_images (gem_id, image_url, display_order, is_primary)
+		SELECT g.gem_id, $3,
+			(SELECT count(*) FROM public.gem_images WHERE gem_id = g.gem_id),
+			NOT EXISTS (SELECT 1 FROM public.gem_images WHERE gem_id = g.gem_id AND is_primary)
+		FROM public.gems g
+		WHERE g.gem_id = $1 AND g.seller_id = $2
+		RETURNING image_id, is_primary
+	`, gemID, sellerID, request.ImageURL).Scan(&imageID, &isPrimary)
+	if err == pgx.ErrNoRows {
+		http.Error(w, "Gem not found or not yours", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Could not save image", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"image_id": imageID, "is_primary": isPrimary})
 }

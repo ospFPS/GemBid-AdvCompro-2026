@@ -1,0 +1,312 @@
+
+/* =========================
+   Seller Analytics Page
+   ========================= */
+
+.seller-analytics-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+    color: #111111;
+}
+
+.analytics-home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+    color: #111111;
+    text-decoration: none;
+}
+
+.analytics-home-link:hover {
+    text-decoration: underline;
+}
+
+.analytics-heading {
+    margin-bottom: 2rem;
+}
+
+.analytics-heading h1 {
+    margin-bottom: 0.75rem;
+    font-size: 3rem;
+}
+
+.analytics-heading p {
+    margin: 0;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.analytics-demo-notice {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border: 1px solid #9b7545;
+    background-color: #ffffff;
+    color: #805d32;
+    font-size: 1.2rem;
+    line-height: 1.6rem;
+}
+
+/* Summary Cards */
+
+.analytics-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.analytics-summary-card {
+    padding: 1.5rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+.analytics-summary-card h2 {
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+}
+
+.analytics-summary-value {
+    margin: 0 0 0.5rem;
+    color: #805d32;
+    font-size: 1.75rem;
+    font-weight: bold;
+}
+
+.analytics-summary-note {
+    margin: 0;
+    color: #555555;
+    font-size: 1.2rem;
+    line-height: 1.5rem;
+}
+
+/* Analytics Sections */
+
+.analytics-section {
+    margin-bottom: 1.5rem;
+    padding: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+.analytics-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.analytics-section-heading h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+}
+
+.analytics-section-heading p {
+    margin: 0;
+    font-size: 1.2rem;
+    line-height: 1.6rem;
+}
+
+.analytics-section-heading select {
+    padding: 0.6rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+    color: #111111;
+    font-size: 1.2rem;
+}
+
+/* Sales Chart */
+
+.analytics-chart {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 1rem;
+    height: 17rem;
+    padding-top: 1rem;
+    border-bottom: 1px solid #cccccc;
+}
+
+.analytics-chart-column {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+}
+
+.analytics-chart-value {
+    min-height: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.analytics-chart-bar-area {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+}
+
+.analytics-chart-bar {
+    width: min(75%, 3rem);
+    min-height: 0.25rem;
+    background-color: #9b7545;
+}
+
+.analytics-chart-label {
+    margin-top: 0.75rem;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.analytics-chart-caption {
+    margin: 1rem 0 0;
+    color: #555555;
+    font-size: 1.2rem;
+}
+
+/* Top-Selling Gemstones Table */
+
+.analytics-table-wrapper {
+    overflow-x: auto;
+}
+
+.analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.2rem;
+}
+
+.analytics-table th,
+.analytics-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #cccccc;
+    text-align: left;
+}
+
+.analytics-table th {
+    background-color: #f4f3f5;
+    font-weight: bold;
+}
+
+.analytics-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Auction and Order Statistics */
+
+.analytics-stat-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.analytics-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid #cccccc;
+    font-size: 1.2rem;
+}
+
+.analytics-stat-row:last-child {
+    border-bottom: none;
+}
+
+.analytics-stat-row strong {
+    color: #805d32;
+    font-size: 1.2rem;
+}
+
+.analytics-orders-link {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid #9b7545;
+    background-color: #9b7545;
+    color: #ffffff;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+
+.analytics-orders-link:hover {
+    background-color: #85633b;
+}
+
+/* Tablet */
+
+@media (max-width: 56.25rem) {
+    .analytics-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Mobile */
+
+@media (max-width: 37.5rem) {
+    .seller-analytics-page {
+        padding: 1rem;
+    }
+
+    .analytics-heading h1 {
+        font-size: 2.2rem;
+    }
+
+    .analytics-heading p {
+        font-size: 1rem;
+    }
+
+    .analytics-summary-card {
+        padding: 1rem;
+    }
+
+    .analytics-summary-card h2 {
+        font-size: 1rem;
+    }
+
+    .analytics-summary-value {
+        font-size: 1.4rem;
+    }
+
+    .analytics-summary-note {
+        font-size: 0.9rem;
+    }
+
+    .analytics-section {
+        padding: 1rem;
+    }
+
+    .analytics-section-heading h2 {
+        font-size: 1.4rem;
+    }
+
+    .analytics-chart {
+        gap: 0.4rem;
+        height: 14rem;
+    }
+
+    .analytics-chart-value {
+        font-size: 0.7rem;
+    }
+
+    .analytics-chart-label {
+        font-size: 0.75rem;
+    }
+
+    .analytics-table {
+        font-size: 0.9rem;
+    }
+
+    .analytics-table th,
+    .analytics-table td {
+        padding: 0.7rem 0.5rem;
+    }
+}
