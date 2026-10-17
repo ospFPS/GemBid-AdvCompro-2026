@@ -1,72 +1,51 @@
 "use client";
-import { useState } from "react";
-const notifications = [
-    {
-        id: 1,
-        type: "outbid",
-        title: "You have been outbid",
-        message: "Someone placed a higher bid on Diamond Ring.",
-        details: "Current bid: $1200",
-        time: "10 minutes ago",
-        unread: true,
-    },
-    {
-        id: 2,
-        type: "auction-won",
-        title: "Auction Won",
-        message: "Congratulations! You won Blue Sapphire.",
-        details: "Winning bid: $520",
-        time: "2 hours ago",
-        unread: true,
-    },
-    {
-        id: 3,
-        type: "shipping",
-        title: "Order Shipped",
-        message: "Your Ruby ring has been shipped.",
-        details: "Order ID: ORD-002",
-        time: "Yesterday",
-        unread: false,
-        link: "/my-purchases/view-order/2?from=notification",
-    },
-    {
-        id: 4,
-        type: "seller",
-        title: "Seller Application Approved",
-        message: "Your application to become a seller has been approved.",
-        details: "You can now create gemstone listings.",
-        time: "2 days ago",
-        unread: false,
-    },
-    {
-        id: 5,
-        type: "order",
-        title: "Purchase Confirmed",
-        message: "Your Amethyst Earrings purchase has been confirmed.",
-        details: "Order total: $2500",
-        time: "3 days ago",
-        unread: false,
-        link: "/my-purchases/view-order/1?from=notification",
-    },
-];
+import { useEffect, useState } from "react";
+import { api, formatDate } from "../lib/api";
+
+// Where a notification should take the user.
+const SELLER_ORDER_TYPES = ["ORDER_CREATED", "PAYMENT_RECEIVED", "ORDER_DELIVERED", "ORDER_CANCELLED", "AUCTION_SOLD"];
+
+function linkFor(n) {
+    if (n.order_id && SELLER_ORDER_TYPES.includes(n.type)) return "/seller-orders";
+    if (n.order_id) return `/my-purchases/view-order/${n.order_id}?from=notification`;
+    if (n.auction_id && n.listing_id) return `/bid?itemId=${n.listing_id}`;
+    if (n.type === "SUBSCRIPTION_ACTIVATED") return "/profile";
+    return null;
+}
+
+function toCard(n) {
+    return {
+        id: n.notification_id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        details: "",
+        time: formatDate(n.created_at),
+        unread: !n.is_read,
+        link: linkFor(n),
+    };
+}
 
 export default function Notifications() {
-    const [notificationList, setNotificationList] = useState(notifications);
+    const [notificationList, setNotificationList] = useState([]);
     const [filter, setFilter] = useState("all");
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        api("/api/notifications")
+            .then((data) => setNotificationList(data.notifications.map(toCard)))
+            .catch((err) => setError(err.message));
+    }, []);
+
     const markAllAsRead = () => {
-        setNotificationList(
-            notificationList.map((notification) => ({
-                ...notification,
-                unread: false,
-            }))
-        );
+        api("/api/notifications/read-all", { method: "PUT" })
+            .then(() => setNotificationList((list) => list.map((n) => ({ ...n, unread: false }))))
+            .catch((err) => setError(err.message));
     };
-    const deleteNotification = (id) => {
-        setNotificationList(
-            notificationList.filter(
-                (notification) => notification.id !== id
-            )
-        );
+    const markAsRead = (id) => {
+        api(`/api/notifications/${id}/read`, { method: "PUT" })
+            .then(() => setNotificationList((list) => list.map((n) => (n.id === id ? { ...n, unread: false } : n))))
+            .catch((err) => setError(err.message));
     };
     const filteredNotifications = notificationList.filter((notification) => {
         if (filter === "unread") {
@@ -80,8 +59,8 @@ export default function Notifications() {
     return (
         <main className="notifications-page">
             <div className="notifications-sticky-nav">
-                <a href="/" className="notifications-home-link">
-                    ← Back to Home
+                <a href="/store" className="notifications-home-link">
+                    ← Back to Store
                 </a>
                 <div className="notification-filters">
                     <button
@@ -115,10 +94,11 @@ export default function Notifications() {
                 </button>
             </div>
                 <h1>Notifications</h1>
+            {error && <p role="alert">{error}</p>}
             
             <div className="notifications-list">
                 {filteredNotifications.length === 0 ? (
-                    <p className="notification-message">No unread messages...</p>
+                    <p className="notification-message">No notifications here.</p>
                 ) : (
                     filteredNotifications.map((notification) => (
                     <section
@@ -133,17 +113,19 @@ export default function Notifications() {
                         </p>
                         {notification.link && (
                             <a href={notification.link}>
-                                View Order
+                                View
                             </a>
                         )}
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => deleteNotification(notification.id)}
-                            >
-                                Delete
-                            </button>
-                        </div>
+                        {notification.unread && (
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => markAsRead(notification.id)}
+                                >
+                                    Mark as read
+                                </button>
+                            </div>
+                        )}
                     </section>
                     ))
                 )}

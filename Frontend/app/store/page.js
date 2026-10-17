@@ -1,5 +1,7 @@
 import Link from "next/link";
+import AccountNav from "../AccountNav";
 import { getListings, PAGE_SIZE_OPTIONS } from "../listings";
+import { formatTHB } from "../lib/api";
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(Array.isArray(value) ? value[0] : value);
@@ -65,16 +67,10 @@ export default async function StorePage({ searchParams }) {
 
   return (
     <main className="store-layout">
-      <img src="/assets/Dependencies2.gif"/>
       <h1 className="title">GemBid</h1>
       {/* Top tab */}
       <nav className="store-top-nav" aria-label="Account navigation">
-        <ul>
-          <li><Link className="nav-link" href="/">Return to Home</Link></li>
-          <li><Link className="nav-link" href="/login">Log in</Link></li>
-          <li><Link className="nav-link" href="/signup">Sign up</Link></li>
-          <li><Link className="nav-link" href="/admin">Admin dashboard</Link></li>
-        </ul>
+        <AccountNav />
       </nav>
 
       <div className="store-content">
@@ -200,10 +196,7 @@ export default async function StorePage({ searchParams }) {
                         <span>Sold by {item.seller}</span>
                       </div>
                       <p className="store-item-price">
-                        {new Intl.NumberFormat("en-US", {
-                          style: "currency",
-                          currency: "USD",
-                        }).format(item.price)}
+                        {formatTHB(item.price)}
                       </p>
                     </article>
                   </Link>

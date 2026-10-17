@@ -1,0 +1,238 @@
+
+/* =========================
+   Orders Page
+   ========================= */
+
+.orders-page {
+    min-height: 100vh;
+    padding: 2rem;
+    background-color: #f4f3f5;
+    color: #111111;
+}
+.seller-orders-home button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    margin-bottom: 1.2rem;
+}
+.seller-orders-home button:hover {
+    background-color: #eeeeee;
+}
+.orders-analytics-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: #111111;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+
+.orders-analytics-link:hover {
+    text-decoration: underline;
+}
+
+.orders-heading {
+    margin-bottom: 2rem;
+}
+
+.orders-heading h1 {
+    margin-bottom: 0.75rem;
+    font-size: 3rem;
+}
+
+.orders-heading p {
+    margin: 0;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+/* Order Filters */
+
+.orders-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.orders-filters button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+}
+
+.orders-filters button.active {
+    background-color: #9b7545;
+    border-color: #9b7545;
+    color: #ffffff;
+}
+
+.orders-filters button:hover {
+    background-color: #eeeeee;
+}
+
+.orders-filters button.active:hover {
+    background-color: #85633b;
+}
+
+/* Orders List */
+
+.orders-list {
+    width: min(100%, 1500px);
+    margin: 0 auto;
+}
+
+.order-card {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 2rem;
+    line-height: 2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+.order-item {
+    display: flex;
+    flex: 1;
+    gap: 1.5rem;
+    min-width: 0;
+}
+
+.order-item img {
+    width: 30rem;
+    height: 27rem;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.order-details {
+    min-width: 0;
+}
+
+.order-details h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.75rem;
+}
+
+.order-details p {
+    margin: 0.5rem 0;
+    font-size: 1.2rem;
+}
+
+.order-details label,
+.order-shipping label {
+    display: block;
+    margin-top: 0.75rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.order-details select,
+.order-shipping input {
+    width: 100%;
+    padding: 0.6rem;
+    font-size: 1.2rem;
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+/* Payment Status */
+
+.payment-status {
+    font-weight: bold;
+}
+
+.payment-paid {
+    color: #28713b;
+}
+
+.payment-pending {
+    color: #9b7545;
+}
+
+/* Shipping Information */
+
+.order-shipping {
+    width: 20rem;
+    flex-shrink: 0;
+}
+
+.order-shipping h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+
+.order-shipping button {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.7rem;
+    cursor: pointer;
+    background-color: #9b7545;
+    border: 1px solid #9b7545;
+    color: #ffffff;
+    font-size: 1.2rem;
+}
+
+.order-shipping button:hover {
+    background-color: #85633b;
+}
+
+.order-message {
+    font-size: 1.2rem;
+    line-height: 1.4rem;
+}
+
+/* Empty State */
+
+.orders-empty {
+    padding: 2rem;
+    text-align: center;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    font-size: 1.2rem;
+}
+
+/* Responsive Layout */
+
+@media (max-width: 56.25rem) {
+    .order-card {
+        flex-direction: column;
+    }
+
+    .order-shipping {
+        width: 100%;
+    }
+}
+
+@media (max-width: 37.5rem) {
+    .orders-page {
+        padding: 1rem;
+    }
+
+    .orders-heading h1 {
+        font-size: 2.3rem;
+    }
+
+    .order-card {
+        padding: 1.25rem;
+    }
+
+    .order-item {
+        flex-direction: column;
+    }
+
+    .order-item img {
+        width: 100%;
+        height: 15rem;
+    }
+
+    .orders-filters button {
+        font-size: 1rem;
+    }
+}

@@ -1,261 +1,137 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getAllListings } from "../listings";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, formatDate, formatTHB, gemImage } from "../lib/api";
 
-const STORAGE_KEY = "gembid.admin.listings";
-const EMPTY_FORM = {
-	title: "",
-	description: "",
-	image: "",
-	price: "",
-	seller: "",
-	isBid: false,
-};
+const LIVE = ["PUBLISHED", "ACTIVE"];
+const SUSPENDABLE = ["DRAFT", "PUBLISHED", "ACTIVE"];
+const REPORT_ACTIONS = ["NONE", "WARN_USER", "SUSPEND_LISTING", "SUSPEND_SELLER"];
 
-function validateListings(value) {
-	if (!Array.isArray(value)) {
-		throw new Error("The file must contain a JSON array of listings.");
-	}
-
-	const listings = value.map((listing, index) => {
-		if (
-			!listing
-			|| typeof listing.id !== "string"
-			|| typeof listing.title !== "string"
-			|| typeof listing.description !== "string"
-			|| typeof listing.image !== "string"
-			|| typeof listing.seller !== "string"
-			|| !listing.title.trim()
-			|| !listing.description.trim()
-			|| !listing.image.trim()
-			|| !listing.seller.trim()
-			|| typeof listing.price !== "number"
-			|| !Number.isFinite(listing.price)
-			|| listing.price < 0
-			|| typeof listing.isBid !== "boolean"
-		) {
-			throw new Error(`Listing ${index + 1} has missing or invalid fields.`);
-		}
-
-		return {
-			...listing,
-			pfp: typeof listing.pfp === "string" ? listing.pfp : "/assets/pfp.png",
-			isActive: listing.isActive !== false,
-		};
-	});
-
-	if (new Set(listings.map((listing) => listing.id)).size !== listings.length) {
-		throw new Error("Every listing must have a unique ID.");
-	}
-
-	return listings;
+function listingPrice(l) {
+	const price = l.sale_type === "AUCTION" ? l.current_price : l.fixed_price;
+	return price == null ? "-" : formatTHB(price);
 }
 
-function formatPrice(price) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(price);
+function reportTarget(r) {
+	if (r.listing_id) return `Listing #${r.listing_id}`;
+	if (r.auction_id) return `Auction #${r.auction_id}`;
+	return `User #${r.reported_user_id}`;
 }
 
 export default function AdminDashboard() {
+	const [access, setAccess] = useState("checking"); // checking | admin | denied
+	const [analytics, setAnalytics] = useState(null);
+	const [applications, setApplications] = useState([]);
 	const [listings, setListings] = useState([]);
-	const [ready, setReady] = useState(false);
+	const [reports, setReports] = useState([]);
+	const [reportActions, setReportActions] = useState({});
 	const [search, setSearch] = useState("");
 	const [typeFilter, setTypeFilter] = useState("all");
 	const [statusFilter, setStatusFilter] = useState("all");
-	const [sortOrder, setSortOrder] = useState("title");
-	const [form, setForm] = useState(EMPTY_FORM);
-	const [editingId, setEditingId] = useState(null);
-	const [formOpen, setFormOpen] = useState(false);
+	const [sortOrder, setSortOrder] = useState("newest");
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
-	const importInput = useRef(null);
 
-	useEffect(() => {
-		let cancelled = false;
-
-		async function loadListings() {
-			try {
-				const savedListings = window.localStorage.getItem(STORAGE_KEY);
-				const initialListings = savedListings === null
-					? await getAllListings()
-					: validateListings(JSON.parse(savedListings));
-				if (!cancelled) {
-					setListings(initialListings.map((listing) => ({
-						...listing,
-						isActive: listing.isActive !== false,
-					})));
-				}
-			} catch (loadError) {
-				if (!cancelled) {
-					setError(loadError instanceof Error
-						? `Could not load saved listings: ${loadError.message}`
-						: "Could not load saved listings.");
-				}
-			} finally {
-				if (!cancelled) setReady(true);
-			}
-		}
-
-		loadListings();
-		return () => {
-			cancelled = true;
-		};
+	const load = useCallback(async () => {
+		const [stats, apps, allListings, pending] = await Promise.all([
+			api("/api/admin/analytics"),
+			api("/api/admin/seller-applications"),
+			api("/api/admin/listings"),
+			api("/api/admin/reports?status=PENDING"),
+		]);
+		setAnalytics(stats);
+		setApplications(apps.applications);
+		setListings(allListings);
+		setReports(pending.reports);
 	}, []);
 
-	function saveListings(nextListings, successMessage) {
+	useEffect(() => {
+		api("/api/me")
+			.then((me) => {
+				if (me.role !== "ADMIN") {
+					setAccess("denied");
+					return;
+				}
+				setAccess("admin");
+				return load();
+			})
+			.catch((err) => {
+				setAccess("denied");
+				setError(err.message);
+			});
+	}, [load]);
+
+	// Run an admin action, show its result, then reload everything.
+	async function act(task, successMessage) {
+		setError("");
+		setNotice("");
 		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextListings));
-			setListings(nextListings);
-			setError("");
+			await task();
 			setNotice(successMessage);
-			return true;
-		} catch (saveError) {
-			setError(saveError instanceof Error
-				? `Could not save listings: ${saveError.message}`
-				: "Could not save listings in this browser.");
-			return false;
+			await load();
+		} catch (err) {
+			setError(err.message);
 		}
 	}
 
-	const activeCount = listings.filter((listing) => listing.isActive !== false).length;
-	const bidCount = listings.filter((listing) => listing.isBid && listing.isActive !== false).length;
+	const reviewSeller = (app, decision) =>
+		act(
+			() => api(`/api/admin/seller-applications/${app.seller_id}`, { method: "PUT", body: { decision } }),
+			`${app.shop_name}: ${decision === "APPROVE" ? "approved" : "rejected"}.`
+		);
+
+	const suspendListing = (listing) => {
+		if (!window.confirm(`Suspend "${listing.gem_name}"? Any running auction is stopped without a winner.`)) return;
+		act(() => api(`/api/admin/listings/${listing.listing_id}/suspend`, { method: "PUT" }), `"${listing.gem_name}" suspended.`);
+	};
+
+	const reviewReport = (report, decision) => {
+		const action = decision === "RESOLVE" ? reportActions[report.report_id] ?? "NONE" : "NONE";
+		act(
+			() => api(`/api/admin/reports/${report.report_id}`, { method: "PUT", body: { decision, action } }),
+			`Report #${report.report_id} ${decision === "RESOLVE" ? "resolved" : "rejected"}.`
+		);
+	};
+
 	const filteredListings = useMemo(() => {
-		const normalizedSearch = search.trim().toLowerCase();
-		const filtered = listings.filter((listing) => {
-			const matchesSearch = `${listing.title} ${listing.seller} ${listing.description}`
-				.toLowerCase()
-				.includes(normalizedSearch);
-			const matchesType = typeFilter === "all"
-				|| (typeFilter === "bid" && listing.isBid)
-				|| (typeFilter === "buy-now" && !listing.isBid);
-			const matchesStatus = statusFilter === "all"
-				|| (statusFilter === "active" && listing.isActive !== false)
-				|| (statusFilter === "hidden" && listing.isActive === false);
-			return matchesSearch && matchesType && matchesStatus;
-		});
+		const query = search.trim().toLowerCase();
+		const filtered = listings.filter((l) =>
+			(typeFilter === "all"
+				|| (typeFilter === "buy-now" && l.sale_type === "FIXED_PRICE")
+				|| (typeFilter === "bid" && l.sale_type === "AUCTION"))
+			&& (statusFilter === "all"
+				|| (statusFilter === "live" ? LIVE.includes(l.status) : l.status === statusFilter))
+			&& `${l.gem_name} ${l.shop_name} ${l.gem_type}`.toLowerCase().includes(query)
+		);
+		const price = (l) => (l.sale_type === "AUCTION" ? l.current_price : l.fixed_price) ?? 0;
+		return filtered.sort((a, b) =>
+			sortOrder === "price-low" ? price(a) - price(b)
+				: sortOrder === "price-high" ? price(b) - price(a)
+					: b.listing_id - a.listing_id
+		);
+	}, [listings, search, typeFilter, statusFilter, sortOrder]);
 
-		return filtered.sort((first, second) => {
-			if (sortOrder === "price-low") return first.price - second.price;
-			if (sortOrder === "price-high") return second.price - first.price;
-			return first.title.localeCompare(second.title);
-		});
-	}, [listings, search, sortOrder, statusFilter, typeFilter]);
-
-	function openCreateForm() {
-		setEditingId(null);
-		setForm(EMPTY_FORM);
-		setFormOpen(true);
-		setError("");
-		setNotice("");
-	}
-
-	function openEditForm(listing) {
-		setEditingId(listing.id);
-		setForm({
-			title: listing.title,
-			description: listing.description,
-			image: listing.image,
-			price: String(listing.price),
-			seller: listing.seller,
-			isBid: listing.isBid,
-		});
-		setFormOpen(true);
-		setError("");
-		setNotice("");
-	}
-
-	function handleSubmit(event) {
-		event.preventDefault();
-		const price = Number(form.price);
-		if (
-			!form.title.trim()
-			|| !form.description.trim()
-			|| !form.image.trim()
-			|| !form.seller.trim()
-			|| !Number.isFinite(price)
-			|| price < 0
-		) {
-			setError("Enter a title, description, image path, seller, and a valid non-negative price.");
-			return;
-		}
-
-		const editing = editingId !== null;
-		const current = listings.find((listing) => listing.id === editingId);
-		const nextListing = {
-			id: current?.id ?? `listing-${crypto.randomUUID()}`,
-			title: form.title.trim(),
-			description: form.description.trim(),
-			image: form.image.trim(),
-			price,
-			isBid: form.isBid,
-			pfp: current?.pfp ?? "/assets/pfp.png",
-			seller: form.seller.trim(),
-			isActive: current?.isActive ?? true,
-		};
-		const nextListings = editing
-			? listings.map((listing) => listing.id === editingId ? nextListing : listing)
-			: [nextListing, ...listings];
-
-		if (saveListings(nextListings, editing ? "Listing updated." : "Listing created.")) {
-			setFormOpen(false);
-		}
-	}
-
-	function toggleListing(listing) {
-		const nextListings = listings.map((current) => current.id === listing.id
-			? { ...current, isActive: current.isActive === false }
-			: current);
-		saveListings(nextListings, listing.isActive === false
-			? "Listing published."
-			: "Listing hidden from the store.");
-	}
-
-	function deleteListing(listing) {
-		if (!window.confirm(`Delete "${listing.title}"? This cannot be undone.`)) return;
-		saveListings(
-			listings.filter((current) => current.id !== listing.id),
-			"Listing deleted.",
+	if (access !== "admin") {
+		return (
+			<main className="admin-page">
+				<header className="admin-header">
+					<div>
+						<p className="admin-eyebrow">GemBid / Management</p>
+						<h1>Admin dashboard</h1>
+					</div>
+					<Link className="admin-back-link" href="/store">View storefront</Link>
+				</header>
+				<p className="admin-empty-state">
+					{access === "checking" ? "Checking access…" : "Admin access required. Log in with an admin account."}
+				</p>
+				{error && <p className="admin-feedback admin-feedback--error" role="alert">{error}</p>}
+			</main>
 		);
 	}
 
-	function exportListings() {
-		try {
-			const blob = new Blob([JSON.stringify(listings, null, 2)], {
-				type: "application/json",
-			});
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = "gembid-listings.json";
-			link.click();
-			window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-			setNotice("Listings exported.");
-			setError("");
-		} catch (exportError) {
-			setError(exportError instanceof Error
-				? `Could not export listings: ${exportError.message}`
-				: "Could not export listings.");
-		}
-	}
-
-	async function importListings(event) {
-		const file = event.target.files?.[0];
-		event.target.value = "";
-		if (!file) return;
-
-		try {
-			const imported = validateListings(JSON.parse(await file.text()));
-			saveListings(imported, `${imported.length} listings imported.`);
-		} catch (importError) {
-			setError(importError instanceof Error
-				? `Could not import listings: ${importError.message}`
-				: "Could not import listings.");
-		}
-	}
+	const pendingApps = applications.filter((a) => a.verification_status === "PENDING").length;
+	const liveCount = listings.filter((l) => LIVE.includes(l.status)).length;
 
 	return (
 		<main className="admin-page">
@@ -263,32 +139,94 @@ export default function AdminDashboard() {
 				<div>
 					<p className="admin-eyebrow">GemBid / Management</p>
 					<h1>Admin dashboard</h1>
-					<p className="admin-subtitle">Manage marketplace listings and storefront visibility.</p>
+					<p className="admin-subtitle">Seller applications, listings, reports and platform numbers.</p>
 				</div>
 				<Link className="admin-back-link" href="/store">View storefront</Link>
 			</header>
 
-			<p className="admin-demo-notice">
-				Frontend-only demo. Changes are saved in this browser; server persistence and administrator sign-in are not connected.
-			</p>
+			{error && <p className="admin-feedback admin-feedback--error" role="alert">{error}</p>}
+			{notice && !error && <p className="admin-feedback" role="status">{notice}</p>}
 
-			<section className="admin-stats" aria-label="Listing overview">
+			<section className="admin-stats" aria-label="Platform overview">
 				<div className="admin-stat">
-					<span>Total listings</span>
-					<strong>{listings.length}</strong>
+					<span>Users</span>
+					<strong>{analytics?.users.total ?? "-"}</strong>
 				</div>
 				<div className="admin-stat">
-					<span>Published</span>
-					<strong>{activeCount}</strong>
+					<span>Live listings</span>
+					<strong>{liveCount}</strong>
 				</div>
 				<div className="admin-stat">
-					<span>Hidden</span>
-					<strong>{listings.length - activeCount}</strong>
+					<span>Pending sellers</span>
+					<strong>{pendingApps}</strong>
 				</div>
 				<div className="admin-stat">
-					<span>Active bids</span>
-					<strong>{bidCount}</strong>
+					<span>Paid orders</span>
+					<strong>{analytics?.sales.paid_orders ?? "-"}</strong>
 				</div>
+				<div className="admin-stat">
+					<span>Sales (GMV)</span>
+					<strong>{formatTHB(analytics?.sales.gross_merchandise_value)}</strong>
+				</div>
+				<div className="admin-stat">
+					<span>PRO members</span>
+					<strong>{analytics?.subscriptions.active_pro ?? "-"}</strong>
+				</div>
+			</section>
+
+			<section className="admin-listings" aria-labelledby="admin-sellers-title">
+				<div className="admin-section-heading">
+					<div>
+						<h2 id="admin-sellers-title">Seller applications</h2>
+						<p>{pendingApps} waiting for review, {applications.length} in total</p>
+					</div>
+				</div>
+				{applications.length === 0 ? (
+					<p className="admin-empty-state">No seller applications yet.</p>
+				) : (
+					<div className="admin-table-wrap">
+						<table className="admin-table">
+							<thead>
+								<tr>
+									<th scope="col">Shop</th>
+									<th scope="col">Applicant</th>
+									<th scope="col">Applied</th>
+									<th scope="col">Status</th>
+									<th scope="col">Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								{applications.map((app) => (
+									<tr key={app.seller_id}>
+										<td>
+											<div className="admin-listing-cell">
+												<div>
+													<strong>{app.shop_name}</strong>
+													<span>{app.seller_type ?? "-"} · {app.legal_name}</span>
+												</div>
+											</div>
+										</td>
+										<td>{app.username}</td>
+										<td>{formatDate(app.applied_at)}</td>
+										<td>
+											<span className={`admin-status ${app.verification_status === "VERIFIED" ? "" : "admin-status--hidden"}`}>
+												{app.verification_status}
+											</span>
+										</td>
+										<td>
+											{app.verification_status === "PENDING" ? (
+												<div className="admin-row-actions">
+													<button className="admin-text-button" type="button" onClick={() => reviewSeller(app, "APPROVE")}>Approve</button>
+													<button className="admin-text-button admin-text-button--danger" type="button" onClick={() => reviewSeller(app, "REJECT")}>Reject</button>
+												</div>
+											) : "-"}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</section>
 
 			<section className="admin-listings" aria-labelledby="admin-listings-title">
@@ -297,71 +235,7 @@ export default function AdminDashboard() {
 						<h2 id="admin-listings-title">Listings</h2>
 						<p>{filteredListings.length} of {listings.length} listings</p>
 					</div>
-					<div className="admin-toolbar">
-						<input
-							ref={importInput}
-							className="admin-file-input"
-							type="file"
-							accept="application/json,.json"
-							onChange={importListings}
-							aria-label="Import listings JSON file"
-						/>
-						<button className="admin-button admin-button--secondary" type="button" onClick={exportListings}>
-							Export JSON
-						</button>
-						<button className="admin-button admin-button--secondary" type="button" onClick={() => importInput.current?.click()}>
-							Import JSON
-						</button>
-						<button className="admin-button admin-button--primary" type="button" onClick={openCreateForm}>
-							Add listing
-						</button>
-					</div>
 				</div>
-
-				{formOpen && (
-					<form className="admin-form" onSubmit={handleSubmit}>
-						<div className="admin-form-heading">
-							<h3>{editingId ? "Edit listing" : "New listing"}</h3>
-							<button className="admin-text-button" type="button" onClick={() => setFormOpen(false)}>
-								Cancel
-							</button>
-						</div>
-						<div className="admin-form-grid">
-							<label>
-								Title
-								<input required maxLength="120" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-							</label>
-							<label>
-								Seller
-								<input required maxLength="80" value={form.seller} onChange={(event) => setForm({ ...form, seller: event.target.value })} />
-							</label>
-							<label className="admin-form-wide">
-								Description
-								<textarea required rows="3" maxLength="1000" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-							</label>
-							<label>
-								Image path or URL
-								<input required value={form.image} placeholder="/assets/example.jpg" onChange={(event) => setForm({ ...form, image: event.target.value })} />
-							</label>
-							<label>
-								Price (USD)
-								<input required type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} />
-							</label>
-							<label className="admin-checkbox-label">
-								<input type="checkbox" checked={form.isBid} onChange={(event) => setForm({ ...form, isBid: event.target.checked })} />
-								This listing uses bidding
-							</label>
-						</div>
-						<div className="admin-form-actions">
-							<button className="admin-button admin-button--primary" type="submit">
-								{editingId ? "Save changes" : "Create listing"}
-							</button>
-							<button className="admin-button admin-button--secondary" type="button" onClick={() => setFormOpen(false)}>
-								Cancel
-							</button>
-						</div>
-					</form>
-				)}
 
 				<div className="admin-filters">
 					<label className="admin-search">
@@ -370,7 +244,7 @@ export default function AdminDashboard() {
 							type="search"
 							value={search}
 							onChange={(event) => setSearch(event.target.value)}
-							placeholder="Search title, seller, or description"
+							placeholder="Search gem, shop or type"
 						/>
 					</label>
 					<label>
@@ -382,28 +256,27 @@ export default function AdminDashboard() {
 						</select>
 					</label>
 					<label>
-						Visibility
+						Status
 						<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
 							<option value="all">All listings</option>
-							<option value="active">Published</option>
-							<option value="hidden">Hidden</option>
+							<option value="live">Live</option>
+							<option value="DRAFT">Draft</option>
+							<option value="SOLD">Sold</option>
+							<option value="UNSOLD">Unsold</option>
+							<option value="SUSPENDED">Suspended</option>
 						</select>
 					</label>
 					<label>
 						Sort by
 						<select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
-							<option value="title">Title</option>
+							<option value="newest">Newest</option>
 							<option value="price-low">Price: low to high</option>
 							<option value="price-high">Price: high to low</option>
 						</select>
 					</label>
 				</div>
 
-				{error && <p className="admin-feedback admin-feedback--error" role="alert">{error}</p>}
-				{notice && !error && <p className="admin-feedback" role="status">{notice}</p>}
-				{!ready ? (
-					<p className="admin-empty-state">Loading listings…</p>
-				) : filteredListings.length === 0 ? (
+				{filteredListings.length === 0 ? (
 					<p className="admin-empty-state">No listings match these filters.</p>
 				) : (
 					<div className="admin-table-wrap">
@@ -413,36 +286,97 @@ export default function AdminDashboard() {
 									<th scope="col">Listing</th>
 									<th scope="col">Type</th>
 									<th scope="col">Price</th>
-									<th scope="col">Visibility</th>
+									<th scope="col">Status</th>
 									<th scope="col">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
 								{filteredListings.map((listing) => (
-									<tr key={listing.id}>
+									<tr key={listing.listing_id}>
 										<td>
 											<div className="admin-listing-cell">
-												<img src={listing.image} alt="" />
+												<img src={listing.image_url || gemImage(listing.gem_type)} alt="" />
 												<div>
-													<strong>{listing.title}</strong>
-													<span>{listing.seller}</span>
+													<strong>{listing.gem_name}</strong>
+													<span>{listing.shop_name}</span>
 												</div>
 											</div>
 										</td>
-										<td>{listing.isBid ? "Bidding" : "Buy now"}</td>
-										<td>{formatPrice(listing.price)}</td>
+										<td>{listing.sale_type === "AUCTION" ? "Bidding" : listing.sale_type ? "Buy now" : "-"}</td>
+										<td>{listingPrice(listing)}</td>
 										<td>
-											<span className={`admin-status ${listing.isActive === false ? "admin-status--hidden" : ""}`}>
-												{listing.isActive === false ? "Hidden" : "Published"}
+											<span className={`admin-status ${LIVE.includes(listing.status) ? "" : "admin-status--hidden"}`}>
+												{listing.status}
 											</span>
 										</td>
 										<td>
 											<div className="admin-row-actions">
-												<button className="admin-text-button" type="button" onClick={() => openEditForm(listing)}>Edit</button>
-												<button className="admin-text-button" type="button" onClick={() => toggleListing(listing)}>
-													{listing.isActive === false ? "Publish" : "Hide"}
-												</button>
-												<button className="admin-text-button admin-text-button--danger" type="button" onClick={() => deleteListing(listing)}>Delete</button>
+												{LIVE.includes(listing.status) && (
+													<Link className="admin-text-button" href={`/item?id=${listing.listing_id}`}>View</Link>
+												)}
+												{SUSPENDABLE.includes(listing.status) && (
+													<button className="admin-text-button admin-text-button--danger" type="button" onClick={() => suspendListing(listing)}>
+														Suspend
+													</button>
+												)}
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</section>
+
+			<section className="admin-listings" aria-labelledby="admin-reports-title">
+				<div className="admin-section-heading">
+					<div>
+						<h2 id="admin-reports-title">Pending reports</h2>
+						<p>{reports.length} waiting for review</p>
+					</div>
+				</div>
+				{reports.length === 0 ? (
+					<p className="admin-empty-state">No pending reports.</p>
+				) : (
+					<div className="admin-table-wrap">
+						<table className="admin-table">
+							<thead>
+								<tr>
+									<th scope="col">Target</th>
+									<th scope="col">Reason</th>
+									<th scope="col">Reported</th>
+									<th scope="col">Action if resolved</th>
+									<th scope="col">Decision</th>
+								</tr>
+							</thead>
+							<tbody>
+								{reports.map((report) => (
+									<tr key={report.report_id}>
+										<td>{reportTarget(report)}</td>
+										<td>
+											<div className="admin-listing-cell">
+												<div>
+													<strong>{report.reason}</strong>
+													<span>{report.description ?? ""}</span>
+												</div>
+											</div>
+										</td>
+										<td>{formatDate(report.created_at)}</td>
+										<td>
+											<select
+												value={reportActions[report.report_id] ?? "NONE"}
+												onChange={(event) => setReportActions({ ...reportActions, [report.report_id]: event.target.value })}
+											>
+												{REPORT_ACTIONS.map((a) => (
+													<option key={a} value={a}>{a.replaceAll("_", " ").toLowerCase()}</option>
+												))}
+											</select>
+										</td>
+										<td>
+											<div className="admin-row-actions">
+												<button className="admin-text-button" type="button" onClick={() => reviewReport(report, "RESOLVE")}>Resolve</button>
+												<button className="admin-text-button admin-text-button--danger" type="button" onClick={() => reviewReport(report, "REJECT")}>Reject</button>
 											</div>
 										</td>
 									</tr>

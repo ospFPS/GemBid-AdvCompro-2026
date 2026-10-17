@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ./backend       # REQUIRED: confirm this matches where your Dockerfile will live
+      dockerfile: Dockerfile   # REQUIRED: we still need to create this file next
+    env_file:
+      - .env                   # REQUIRED: must exist at project root with DATABASE_URL, PORT, JWT_SECRET
+    ports:
+      - "8080:8080"            # REQUIRED: left side = host port you'll browse to, right side = must match PORT in .env
+    restart: unless-stopped     # optional, but nice so it restarts if it crashes
+
+  frontend:
+    build:
+      context: ./Frontend
+      args:
+        BACKEND_URL: http://backend:8080
+    environment:
+      BACKEND_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped

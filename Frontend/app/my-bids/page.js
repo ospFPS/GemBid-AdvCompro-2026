@@ -1,54 +1,33 @@
 "use client";
-import { useState } from "react";
-const bids = [
-    {
-        id: 1,
-        gemstone: "Blue Sapphire",
-        image: "/assets/my-bids/Blue sapphire.webp",
-        yourBid: "$500",
-        currentBid: "$520",
-        status: "Won",
-        auctionEnds: "2 hours 15 minutes",
-    },
-    {
-        id: 2,
-        gemstone: "Ruby Necklace",
-        image: "/assets/my-bids/Ruby necklace.jpg",
-        yourBid: "$280",
-        currentBid: "$280",
-        status: "Winning",
-        auctionEnds: "5 hours 30 minutes",
-    },
-    {
-        id: 3,
-        gemstone: "Emerald Earrings",
-        image: "/assets/my-bids/Emerald earrings.webp",
-        yourBid: "$350",
-        currentBid: "$400",
-        status: "Lost",
-        auctionEnds: "Ended",
-    },
-    {
-        id: 4,
-        gemstone: "Diamond Ring",
-        image: "/assets/my-bids/Diamond ring.webp",
-        yourBid: "$1000",
-        currentBid: "$1200",
-        status: "Outbid",
-        auctionEnds: "1 hour 45 minutes",
-    },
-    {
-        id: 5,
-        gemstone: "Sapphire Earrings",
-        image: "/assets/my-bids/Sapphire earrings.webp",
-        yourBid: "$650",
-        currentBid: "$650",
-        status: "Winning",
-        auctionEnds: "3 hours 10 minutes",
-    }
-];
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { api, formatDate, formatTHB, gemImage } from "../lib/api";
+
+// One row per auction from GET /api/me/bids.
+function toBidCard(b) {
+    const ended = b.auction_status === "ENDED";
+    return {
+        id: b.auction_id,
+        listingId: b.listing_id,
+        gemstone: b.gem_name,
+        image: b.image_url || gemImage(b.gem_type),
+        yourBid: formatTHB(b.my_highest_bid),
+        currentBid: formatTHB(b.current_price),
+        status: ended ? (b.is_winner ? "Won" : "Lost") : b.is_leading ? "Winning" : "Outbid",
+        auctionEnds: ended ? "Ended" : formatDate(b.end_time),
+    };
+}
+
 export default function MyBids() {
     const [filter, setFilter] = useState("active");
+    const [bids, setBids] = useState([]);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        api("/api/me/bids")
+            .then((list) => setBids(list.map(toBidCard)))
+            .catch((err) => setError(err.message));
+    }, []);
     const filteredBids = bids.filter((bid) => {
         if (filter === "active") {
             return bid.status === "Winning" || bid.status === "Outbid";
@@ -64,8 +43,8 @@ export default function MyBids() {
     return (
         <main className="my-bids-page">
             <div className="my-bids-sticky-nav">
-                <a href="/" className="my-bids-home-link">
-                    ← Back to Home
+                <a href="/store" className="my-bids-home-link">
+                    ← Back to Store
                 </a>
                 <div className="bid-filters">
                     <button
@@ -92,6 +71,8 @@ export default function MyBids() {
                 </div>
             </div>
             <h1>My Bids</h1>
+            {error && <p role="alert">{error}</p>}
+            {!error && filteredBids.length === 0 && <p>No bids here yet.</p>}
             
             <div className="bids-list">
                 {filteredBids.map((bid) => (
@@ -116,9 +97,16 @@ export default function MyBids() {
                         <p>
                             <strong>Auction ends:</strong> {bid.auctionEnds}
                         </p>
-                        <button type="button">
+                        <Link
+                            href={
+                            bid.status === "Won"
+                                ? `/my-purchases`
+                                : `/bid?itemId=${bid.listingId}`
+                            }
+                            className="bid-action-button"
+                        >
                             {bid.status === "Won" ? "View Purchase" : "View Auction"}
-                        </button>
+                        </Link>
                     </section>
                 ))}
             </div>

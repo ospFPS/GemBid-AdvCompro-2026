@@ -2,21 +2,16 @@
 
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
+import { api, formatTHB } from "../lib/api";
 import {
 	getCartSnapshot,
 	getServerCartSnapshot,
 	parseCartSnapshot,
+	readCartIds,
 	removeCartItem,
 	saveCartIds,
 	subscribeToCart,
 } from "./cartStorage";
-
-function formatPrice(price) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(price);
-}
 
 export default function CartContents({ listings }) {
 	const cartSnapshot = useSyncExternalStore(
@@ -26,6 +21,7 @@ export default function CartContents({ listings }) {
 	);
 	const { ids: cartIds, error: storageError } = parseCartSnapshot(cartSnapshot);
 	const [actionError, setActionError] = useState("");
+	const [checkingOut, setCheckingOut] = useState(false);
 
 	function updateCart(action, itemId) {
 		try {
@@ -38,6 +34,26 @@ export default function CartContents({ listings }) {
 		} catch (updateError) {
 			setActionError(updateError instanceof Error ? updateError.message : "Unable to update the cart.");
 		}
+	}
+
+	// Each listing is one unique gem, so checkout buys every listing in the cart once.
+	async function checkout() {
+		setCheckingOut(true);
+		const failed = [];
+		for (const { item } of cartItems) {
+			try {
+				await api(`/api/listings/${item.id}/buy`, { method: "POST" });
+				saveCartIds(readCartIds().filter((id) => id !== item.id));
+			} catch (err) {
+				failed.push(`${item.title}: ${err.message}`);
+			}
+		}
+		if (failed.length === 0) {
+			window.location.href = "/my-purchases";
+			return;
+		}
+		setActionError(`Some items could not be bought. ${failed.join(" ")}`);
+		setCheckingOut(false);
 	}
 
 	function clearInvalidCart() {
@@ -85,7 +101,7 @@ export default function CartContents({ listings }) {
 								<img src={item.image} alt={item.title} />
 								<span className="cart-item-details">
 									<strong>{item.title}</strong>
-									<span>{formatPrice(item.price)}</span>
+									<span>{formatTHB(item.price)}</span>
 								</span>
 							</Link>
 							<div className="cart-item-controls" aria-label={`${item.title} quantity`}>
@@ -114,14 +130,19 @@ export default function CartContents({ listings }) {
 					<h2 id="cart-summary-heading">Order summary</h2>
 					<p>
 						<span>Items ({itemCount})</span>
-						<strong>{formatPrice(totalPrice)}</strong>
+						<strong>{formatTHB(totalPrice)}</strong>
 					</p>
 					<p className="cart-summary-total">
 						<span>Total</span>
-						<strong>{formatPrice(totalPrice)}</strong>
+						<strong>{formatTHB(totalPrice)}</strong>
 					</p>
-					<button className="item-action-button" type="button" disabled>
-						Buying coming soon
+					<button
+						className="item-action-button"
+						type="button"
+						onClick={checkout}
+						disabled={checkingOut || cartItems.length === 0}
+					>
+						{checkingOut ? "Placing orders..." : "Checkout"}
 					</button>
 				</aside>
 			</div>
