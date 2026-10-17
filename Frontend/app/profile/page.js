@@ -15,12 +15,30 @@ export default function Profile() {
     const [user, setUser] = useState(null);
     const [plan, setPlan] = useState(null);
     const [message, setMessage] = useState("");
+    const [planError, setPlanError] = useState("");
+    const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
-        api("/api/me").then(setUser).catch((err) => setMessage(err.message));
-        api("/api/subscriptions/me").then(setPlan).catch(() => {});
+        if (!getToken()) {
+            window.location.replace("/login");
+            return;
+        }
+        loadProfile();
     }, []);
+
+    function loadProfile() {
+        setLoading(true);
+        setMessage("");
+        setPlanError("");
+        api("/api/me")
+            .then(setUser)
+            .catch((err) => setMessage(`Unable to load your profile: ${err.message}`))
+            .finally(() => setLoading(false));
+        api("/api/subscriptions/me")
+            .then(setPlan)
+            .catch((err) => setPlanError(`Subscription details are unavailable: ${err.message}`));
+    }
 
     async function saveChanges(event) {
         event.preventDefault();
@@ -68,7 +86,20 @@ export default function Profile() {
     }
 
     if (!user) {
-        return <main className="profile-page"><p>{message || "Loading profile..."}</p></main>;
+        return (
+            <main className="profile-page">
+                {loading ? (
+                    <p role="status">Loading profile...</p>
+                ) : (
+                    <>
+                        <p role="alert">{message}</p>
+                        <button type="button" onClick={loadProfile}>Retry</button>
+                        {" "}
+                        <a href="/store" className="profile-home-link">Back to Store</a>
+                    </>
+                )}
+            </main>
+        );
     }
 
     return (
@@ -137,7 +168,9 @@ export default function Profile() {
             <section className="profile-card">
                 <h2>Plan</h2>
                 <div className="profile-status">
-                    {plan?.plan === "PRO" ? (
+                    {planError ? (
+                        <p role="alert">{planError}</p>
+                    ) : plan?.plan === "PRO" ? (
                         <p>GemBid PRO until {formatDate(plan.subscription.end_date)}: unlimited live listings.</p>
                     ) : (
                         <p>FREE plan: up to 5 live listings as a seller.</p>

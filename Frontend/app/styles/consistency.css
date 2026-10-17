@@ -1,0 +1,885 @@
+:root {
+  --gembid-text: #111111;
+  --gembid-muted: #555555;
+  --gembid-border: #e2e5e9;
+  --gembid-soft: #f5f5f5;
+  --gembid-primary: #111111;
+  --gembid-primary-hover: #333333;
+  --gembid-shadow: 0 0.25rem 1rem rgb(17 24 39 / 5%);
+}
+
+body {
+  color: var(--gembid-text);
+  background: #ffffff;
+}
+
+.user-home {
+  min-height: 100vh;
+  color: var(--gembid-text);
+  background: #ffffff;
+}
+
+.store-layout .title {
+  margin: 1.25rem 1rem;
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  letter-spacing: -0.035em;
+}
+
+.store-top-nav ul {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  border-color: var(--gembid-border);
+}
+
+.store-top-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--gembid-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.store-top-nav a.nav-link:hover,
+.store-top-nav a.nav-link:focus-visible {
+  border-color: var(--gembid-text);
+}
+
+.store-top-nav button.nav-link {
+  background: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.store-left-nav {
+  border-color: var(--gembid-border);
+}
+
+.store-left-nav > img {
+  display: block;
+  margin: auto 0 0;
+}
+
+.store-item,
+.item-detail {
+  border-color: var(--gembid-border);
+  border-radius: 0.35rem;
+  box-shadow: var(--gembid-shadow);
+}
+
+.store-item-link:hover .store-item {
+  border-color: var(--gembid-text);
+}
+
+.item-back-link:hover {
+  color: var(--gembid-text);
+}
+
+.item-detail-infoBox h1 {
+  color: var(--gembid-text);
+  text-align: left;
+}
+
+.view-listing-details h1 {
+  text-align: left;
+}
+
+.item-detail-price {
+  color: var(--gembid-text);
+}
+
+.item-detail-price-box {
+  border-color: var(--gembid-border);
+  border-radius: 0.35rem;
+  background: var(--gembid-soft);
+}
+
+.item-action-button,
+.analytics-orders-link,
+.my-auction-view-link,
+.bid-action-button {
+  border-color: var(--gembid-primary);
+  border-radius: 999px;
+  background: var(--gembid-primary);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.item-action-button:hover,
+.analytics-orders-link:hover,
+.my-auction-view-link:hover,
+.bid-action-button:hover {
+  border-color: var(--gembid-primary-hover);
+  background: var(--gembid-primary-hover);
+  color: #ffffff;
+}
+
+.item-action-button--secondary {
+  border-color: var(--gembid-border);
+  background: #ffffff;
+  color: var(--gembid-text);
+}
+
+.item-action-button--secondary:hover {
+  border-color: var(--gembid-text);
+  background: var(--gembid-text);
+  color: #ffffff;
+}
+
+.home-header {
+  border-color: var(--gembid-border);
+  background: #ffffff;
+}
+
+.home-header h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  letter-spacing: -0.035em;
+}
+
+.home-header nav {
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.home-header nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--gembid-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.home-header nav a:hover,
+.home-header nav a:focus-visible {
+  border-color: var(--gembid-text);
+  text-decoration: none;
+}
+
+.home-header nav a.Become-seller {
+  color: var(--gembid-text);
+}
+
+.home-content {
+  width: min(calc(100% - 2rem), 80rem);
+  padding: 2rem 0 3rem;
+}
+
+.welcome-section,
+.home-card,
+.cart-item,
+.cart-summary,
+.cart-empty,
+.cart-error,
+.bid-listing,
+.bid-summary,
+.profile-card,
+.notification-card,
+.bid-card,
+.purchase-card,
+.view-order-page .order-details,
+.view-order-page .order-progress,
+.seller-form-card,
+.analytics-summary-card,
+.analytics-section,
+.listing-form-section,
+.listing-card,
+.view-listing-content,
+.edit-listing-section,
+.my-auction-card,
+.order-card,
+.admin-stat,
+.admin-listings,
+.admin-form {
+  border-color: var(--gembid-border);
+  border-radius: 0.35rem;
+  background-color: #ffffff;
+  box-shadow: var(--gembid-shadow);
+}
+
+.welcome-section,
+.home-card,
+.cart-summary,
+.cart-empty,
+.cart-error,
+.bid-listing,
+.bid-summary,
+.profile-card,
+.notification-card,
+.bid-card,
+.purchase-card,
+.view-order-page .order-details,
+.view-order-page .order-progress,
+.seller-form-card,
+.analytics-summary-card,
+.analytics-section,
+.listing-form-section,
+.listing-card,
+.edit-listing-section,
+.my-auction-card,
+.order-card,
+.admin-stat,
+.admin-listings,
+.admin-form {
+  padding: 1.25rem;
+}
+
+.cart-item {
+  padding: 1rem;
+}
+
+.view-listing-content {
+  padding: 1.5rem;
+}
+
+.auth-card {
+  border-color: var(--gembid-border);
+  border-radius: 0.35rem;
+  background: #ffffff;
+  box-shadow: 0 0.5rem 2rem rgb(17 24 39 / 12%);
+}
+
+.welcome-section {
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.welcome-section h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.035em;
+}
+
+.home-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-card:hover {
+  border-width: 1px;
+  border-color: var(--gembid-text);
+  box-shadow: 0 0.5rem 1.5rem rgb(17 24 39 / 8%);
+}
+
+.seller-card,
+.seller-card:hover {
+  border-color: var(--gembid-border);
+}
+
+.login-signup-page {
+  background-color: #f5f5f5;
+  background-position: center;
+}
+
+.auth-card {
+  box-shadow: 0 0.5rem 2rem rgb(17 24 39 / 12%);
+}
+
+.auth-card h1 {
+  text-align: left;
+}
+
+.cart-page,
+.profile-page,
+.notifications-page,
+.my-bids-page,
+.my-purchases-page,
+.view-order-page,
+.seller-page,
+.my-auctions-page,
+.orders-page,
+.seller-analytics-page,
+.create-listing-page,
+.my-listings-page,
+.view-listing-page,
+.edit-listing-page {
+  width: min(calc(100% - 2rem), 80rem);
+  max-width: none;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 2rem 0 3rem;
+  background: #ffffff;
+}
+
+.cart-page > h1,
+.profile-page > h1,
+.notifications-page > h1,
+.my-bids-page > h1,
+.my-purchases-page > h1,
+.seller-page > h1,
+.my-auctions-heading h1,
+.orders-heading h1,
+.analytics-heading h1,
+.create-listing-heading h1,
+.my-listings-heading h1,
+.edit-listing-heading h1,
+.view-order-page h1,
+.admin-header h1 {
+  margin: 0 0 1.5rem;
+  color: var(--gembid-text);
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.my-auctions-heading,
+.orders-heading,
+.analytics-heading,
+.create-listing-heading,
+.my-listings-heading,
+.edit-listing-heading {
+  margin-bottom: 1.5rem;
+}
+
+.my-auctions-heading p,
+.orders-heading p,
+.analytics-heading p,
+.create-listing-heading p,
+.my-listings-heading p,
+.edit-listing-heading p,
+.seller-introduction {
+  color: var(--gembid-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.profile-home-link,
+.notifications-home-link,
+.my-bids-home-link,
+.my-purchases-home-link,
+.view-order-back-link,
+.seller-home-link,
+.my-auctions-home-link,
+.orders-analytics-link,
+.analytics-home-link,
+.create-listing-back-link,
+.my-listings-home-link,
+.view-listing-back-link,
+.edit-listing-back-link,
+.seller-orders-home,
+.view-order-home {
+  color: var(--gembid-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.profile-home-link:hover,
+.notifications-home-link:hover,
+.my-bids-home-link:hover,
+.my-purchases-home-link:hover,
+.view-order-back-link:hover,
+.seller-home-link:hover,
+.my-auctions-home-link:hover,
+.orders-analytics-link:hover,
+.analytics-home-link:hover,
+.create-listing-back-link:hover,
+.my-listings-home-link:hover,
+.view-listing-back-link:hover,
+.edit-listing-back-link:hover {
+  text-decoration: underline;
+}
+
+.my-bids-sticky-nav,
+.my-purchases-sticky-nav,
+.notifications-sticky-nav,
+.view-order-sticky-nav,
+.my-listings-sticky-nav {
+  border-bottom: 1px solid var(--gembid-border);
+  background: #ffffff;
+}
+
+.notification-filters,
+.bid-filters,
+.purchase-filters,
+.my-auctions-filters,
+.orders-filters,
+.listing-filters {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-card p,
+.profile-information p,
+.profile-status p,
+.notification-card p,
+.bids-list p,
+.purchases-list p,
+.order-details p,
+.order-progress p,
+.seller-form-card p,
+.my-auction-details p,
+.order-details p,
+.order-message {
+  color: var(--gembid-text);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.profile-card h2,
+.notification-card h2,
+.bids-list h2,
+.purchases-list h2,
+.order-details h2,
+.order-progress h2,
+.seller-form-card h2,
+.listing-form-section h2,
+.listing-card h2 {
+  color: var(--gembid-text);
+}
+
+.notification-time,
+.auth-description,
+.analytics-summary-note {
+  color: var(--gembid-muted);
+}
+
+.notification-message {
+  padding: 2rem;
+  border: 1px solid var(--gembid-border);
+  border-radius: 0.35rem;
+  background: #ffffff;
+  color: var(--gembid-muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.profile-page button,
+.notifications-page button,
+.my-bids-page button,
+.my-purchases-page button,
+.view-order-page button,
+.seller-page button,
+.my-auctions-page button,
+.orders-page button,
+.seller-analytics-page button,
+.create-listing-page button,
+.my-listings-page button,
+.view-listing-page button,
+.edit-listing-page button,
+.cart-page button,
+.item-detail-layout button,
+.admin-page button {
+  min-height: 2.5rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--gembid-text);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--gembid-text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.profile-page button:hover,
+.notifications-page button:hover,
+.my-bids-page button:hover,
+.my-purchases-page button:hover,
+.view-order-page button:hover,
+.seller-page button:hover,
+.my-auctions-page button:hover,
+.orders-page button:hover,
+.seller-analytics-page button:hover,
+.create-listing-page button:hover,
+.my-listings-page button:hover,
+.view-listing-page button:hover,
+.edit-listing-page button:hover,
+.cart-page button:hover,
+.item-detail-layout button:hover,
+.admin-page button:hover {
+  border-color: var(--gembid-primary-hover);
+  background: var(--gembid-primary-hover);
+  color: #ffffff;
+}
+
+.notifications-page .notification-filters button.active,
+.my-bids-page .bid-filters button.active,
+.my-purchases-page .purchase-filters button.active,
+.my-auctions-page .my-auctions-filters button.active,
+.orders-page .orders-filters button.active,
+.my-listings-page .listing-filters button.active {
+  border-color: var(--gembid-primary);
+  background: var(--gembid-primary);
+  color: #ffffff;
+}
+
+.notifications-page .mark-all-read-button,
+.orders-page .order-shipping button,
+.seller-page .seller-form-card button,
+.seller-analytics-page .analytics-orders-link,
+.create-listing-page .publish-listing-button,
+.my-listings-page .create-listing-button,
+.admin-page .admin-button--primary {
+  border-color: var(--gembid-primary);
+  background: var(--gembid-primary);
+  color: #ffffff;
+}
+
+.notifications-page .mark-all-read-button:hover,
+.orders-page .order-shipping button:hover,
+.seller-page .seller-form-card button:hover,
+.seller-analytics-page .analytics-orders-link:hover,
+.create-listing-page .publish-listing-button:hover,
+.my-listings-page .create-listing-button:hover,
+.admin-page .admin-button--primary:hover {
+  border-color: var(--gembid-primary-hover);
+  background: var(--gembid-primary-hover);
+  color: #ffffff;
+}
+
+.create-listing-page .save-draft-button,
+.admin-page .admin-button--secondary {
+  border-color: var(--gembid-border);
+  background: #ffffff;
+  color: var(--gembid-text);
+}
+
+.admin-page {
+  color: var(--gembid-text);
+}
+
+.admin-header h1 {
+  color: var(--gembid-text);
+}
+
+.admin-eyebrow,
+.admin-back-link,
+.admin-text-button {
+  color: var(--gembid-text);
+}
+
+.admin-demo-notice {
+  border-color: var(--gembid-border);
+  border-radius: 0.35rem;
+  color: var(--gembid-text);
+}
+
+.admin-form {
+  background: #ffffff;
+}
+
+.admin-form input:not([type="checkbox"]),
+.admin-form textarea,
+.admin-filters input,
+.admin-filters select {
+  border-radius: 0.35rem;
+}
+
+.admin-checkbox-label input {
+  accent-color: var(--gembid-primary);
+}
+
+.admin-status {
+  border-radius: 999px;
+}
+
+.seller-page .seller-form-card input,
+.seller-page .seller-form-card textarea,
+.seller-page .seller-form-card select,
+.create-listing-page .listing-form-group input,
+.create-listing-page .listing-form-group select,
+.create-listing-page .listing-form-group textarea,
+.edit-listing-page .edit-listing-group input,
+.edit-listing-page .edit-listing-group select,
+.edit-listing-page .edit-listing-group textarea,
+.profile-page .profile-edit-form input,
+.orders-page .order-details select,
+.orders-page .order-shipping input,
+.analytics-section select,
+.cart-page .bid-amount-field input {
+  min-height: 2.5rem;
+  border: 1px solid #b8b8b8;
+  border-radius: 0.35rem;
+  color: var(--gembid-text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.profile-page label,
+.seller-page label,
+.create-listing-page label,
+.edit-listing-page label,
+.orders-page label,
+.cart-page .bid-summary label,
+.admin-page .admin-form-grid label,
+.admin-page .admin-filters label {
+  color: var(--gembid-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.profile-page input:focus-visible,
+.seller-page input:focus-visible,
+.seller-page textarea:focus-visible,
+.seller-page select:focus-visible,
+.create-listing-page input:focus-visible,
+.create-listing-page textarea:focus-visible,
+.create-listing-page select:focus-visible,
+.edit-listing-page input:focus-visible,
+.edit-listing-page textarea:focus-visible,
+.edit-listing-page select:focus-visible,
+.orders-page input:focus-visible,
+.orders-page select:focus-visible,
+.admin-page input:focus-visible,
+.admin-page textarea:focus-visible,
+.admin-page select:focus-visible,
+.analytics-section select:focus-visible {
+  outline: 2px solid #777777;
+  outline-offset: 2px;
+}
+
+.analytics-summary-value,
+.analytics-stat-row strong {
+  color: var(--gembid-text);
+}
+
+.analytics-chart-bar {
+  background: var(--gembid-text);
+}
+
+.analytics-table th {
+  background: var(--gembid-soft);
+}
+
+.my-auctions-filters button.active {
+  border-color: var(--gembid-primary);
+  background: var(--gembid-primary);
+  color: #ffffff;
+}
+
+.my-auctions-filters button.active:hover {
+  background: var(--gembid-primary-hover);
+}
+
+.my-auction-status {
+  border-radius: 999px;
+}
+
+.bid-action-button,
+.my-auction-view-link,
+.analytics-orders-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.6rem 1rem;
+}
+
+.listing-card img,
+.bid-card img,
+.purchase-card img,
+.order-item img,
+.my-auction-card img {
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.listing-card img {
+  width: min(100%, 15rem);
+  height: 15rem;
+}
+
+.bid-card img,
+.purchase-card img {
+  width: min(100%, 20rem);
+  height: 15rem;
+}
+
+.my-auction-card img {
+  width: min(40%, 15rem);
+  height: 15rem;
+}
+
+.orders-page .order-item img {
+  width: min(45%, 22rem);
+  height: 18rem;
+}
+
+.order-details img {
+  width: min(100%, 25rem);
+  height: 20rem;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.cart-page .item-action-button,
+.item-detail-layout .item-action-button {
+  border-color: var(--gembid-primary);
+  background: var(--gembid-primary);
+  color: #ffffff;
+}
+
+.cart-page .item-action-button:hover,
+.item-detail-layout .item-action-button:hover {
+  border-color: var(--gembid-primary-hover);
+  background: var(--gembid-primary-hover);
+  color: #ffffff;
+}
+
+.cart-page .item-action-button--secondary,
+.item-detail-layout .item-action-button--secondary {
+  border-color: var(--gembid-border);
+  background: #ffffff;
+  color: var(--gembid-text);
+}
+
+.cart-page .item-action-button--secondary:hover,
+.item-detail-layout .item-action-button--secondary:hover {
+  border-color: var(--gembid-text);
+  background: var(--gembid-text);
+  color: #ffffff;
+}
+
+.profile-page input:not([type="checkbox"]),
+.orders-page input,
+.orders-page select,
+.seller-page input,
+.seller-page select,
+.seller-page textarea,
+.create-listing-page input,
+.create-listing-page select,
+.create-listing-page textarea,
+.edit-listing-page input,
+.edit-listing-page select,
+.edit-listing-page textarea {
+  box-sizing: border-box;
+}
+
+.profile-page button:disabled,
+.cart-page button:disabled,
+.seller-page button:disabled,
+.create-listing-page button:disabled,
+.admin-page button:disabled {
+  border-color: #b8b8b8;
+  background: #e5e5e5;
+  color: #555555;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .store-top-nav ul {
+    padding: 0.75rem 1rem;
+  }
+
+  .store-content {
+    padding-bottom: 1rem;
+  }
+
+  .store-left-nav ul {
+    flex-wrap: wrap;
+  }
+
+  #items,
+  .more-items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  }
+
+  .home-header {
+    padding: 1rem;
+  }
+
+  .home-header nav {
+    justify-content: flex-start;
+  }
+
+  .home-content {
+    padding: 1rem 0 2rem;
+  }
+
+  .home-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cart-page,
+  .profile-page,
+  .notifications-page,
+  .my-bids-page,
+  .my-purchases-page,
+  .view-order-page,
+  .seller-page,
+  .my-auctions-page,
+  .orders-page,
+  .seller-analytics-page,
+  .create-listing-page,
+  .my-listings-page,
+  .view-listing-page,
+  .edit-listing-page {
+    width: min(calc(100% - 2rem), 80rem);
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+  }
+
+  .my-auction-card img {
+    width: 100%;
+    height: 18rem;
+  }
+
+  .orders-page .order-item img {
+    width: 100%;
+    height: 15rem;
+  }
+
+  .notification-filters,
+  .bid-filters,
+  .purchase-filters,
+  .my-auctions-filters,
+  .orders-filters,
+  .listing-filters {
+    gap: 0.5rem;
+  }
+
+  .notification-message {
+    padding: 1.25rem;
+  }
+
+  .my-bids-page > h1,
+  .my-purchases-page > h1,
+  .notifications-page > h1,
+  .profile-page > h1,
+  .seller-page > h1,
+  .cart-page > h1 {
+    margin-bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .store-top-nav .nav-link {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.8rem;
+  }
+
+  .store-layout .title,
+  .home-header h1 {
+    font-size: 2.2rem;
+  }
+
+  .listing-search {
+    align-items: stretch;
+  }
+
+  .listing-search label {
+    flex-basis: 100%;
+  }
+
+  .bid-filters button,
+  .purchase-filters button,
+  .notification-filters button,
+  .my-auctions-filters button,
+  .orders-filters button,
+  .listing-filters button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}
