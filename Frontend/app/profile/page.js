@@ -189,7 +189,7 @@ export default function Profile() {
                     <button
                         onClick={() => {
                             logout();
-                            window.location.href = "/store";
+                            window.location.href = "/";
                         }}
                     >
                         Log Out
