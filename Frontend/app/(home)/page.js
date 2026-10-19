@@ -1,6 +1,7 @@
 export default function Home() {
     return (
         <main className="user-home">
+            <img src="/assets/Dependencies2.gif"/>
             <header className="home-header">
                 <h1>GemBid</h1>
                 <nav>
