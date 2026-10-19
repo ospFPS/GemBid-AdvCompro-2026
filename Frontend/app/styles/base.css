@@ -11,6 +11,11 @@ body {
   font-family: Arial, sans-serif;
 }
 
+/* Long words (e.g. URLs in a listing description) wrap instead of widening the page. */
+p {
+  overflow-wrap: anywhere;
+}
+
 h1 {
   font-size: 2rem;
   margin-top: 0;

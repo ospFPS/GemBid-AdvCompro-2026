@@ -28,7 +28,7 @@ export default function AccountNav() {
 	if (!user) {
 		return (
 			<ul>
-				<li><Link className="nav-link" href="/">Return to Home</Link></li>
+				<li><Link className="nav-link" href="/">Home</Link></li>
 				<li><Link className="nav-link" href="/login">Log in</Link></li>
 				<li><Link className="nav-link" href="/signup">Sign up</Link></li>
 			</ul>
@@ -39,6 +39,7 @@ export default function AccountNav() {
 	return (
 		<ul>
 			<li><span className="nav-link">Hi, {user.username}</span></li>
+			<li><Link className="nav-link" href="/">Home</Link></li>
 			{user.role === "ADMIN" && (
 				<li><Link className="nav-link" href="/admin">Admin Dashboard</Link></li>
 			)}
@@ -62,7 +63,7 @@ export default function AccountNav() {
 					className="nav-link"
 					onClick={() => {
 						logout();
-						window.location.href = "/store";
+						window.location.href = "/";
 					}}
 				>
 					Log out

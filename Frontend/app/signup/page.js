@@ -22,7 +22,7 @@ export default function SignupPage() {
       await api("/api/register", { method: "POST", body: { ...credentials, email: form.get("email") } });
       const { token, user } = await api("/api/login", { method: "POST", body: credentials });
       saveLogin(token, user);
-      window.location.href = "/store";
+      window.location.href = "/";
     } catch (err) {
       setError(err.message);
       setBusy(false);
