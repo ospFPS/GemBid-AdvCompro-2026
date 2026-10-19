@@ -84,7 +84,7 @@ export default function OrderView({ id }) {
 			{order.status === "PENDING_PAYMENT" && (
 				<section className="order-details">
 					<h2>Payment</h2>
-					<form onSubmit={pay}>
+					<form className="order-payment-form" onSubmit={pay}>
 						<label htmlFor="payment_method">Payment method</label>
 						<select id="payment_method" name="payment_method" defaultValue="MOCK_CARD">
 							<option value="MOCK_CARD">Card (demo)</option>
@@ -92,11 +92,13 @@ export default function OrderView({ id }) {
 						</select>
 						<label htmlFor="shipping_address">Shipping address</label>
 						<textarea id="shipping_address" name="shipping_address" rows={3} required />
-						<button type="submit" disabled={busy}>{busy ? "Paying..." : "Pay now"}</button>
+						<div className="order-payment-actions">
+							<button type="submit" disabled={busy}>{busy ? "Paying..." : "Pay now"}</button>
+							<button type="button" disabled={busy} onClick={() => act(`/api/orders/${id}/cancel`)}>
+								Cancel order
+							</button>
+						</div>
 					</form>
-					<button type="button" disabled={busy} onClick={() => act(`/api/orders/${id}/cancel`)}>
-						Cancel order
-					</button>
 				</section>
 			)}
 

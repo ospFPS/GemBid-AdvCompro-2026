@@ -69,3 +69,12 @@
     height: 425px;
     object-fit: cover;
 }
+.order-payment-form textarea {
+    resize: none;
+}
+.order-payment-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
