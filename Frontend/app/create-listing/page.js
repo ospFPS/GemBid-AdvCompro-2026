@@ -25,21 +25,40 @@ export default function CreateListing() {
     const [message, setMessage] = useState("");
     const [durationMinutes, setDurationMinutes] = useState(60 * 24);
     const [busy, setBusy] = useState(false);
+    const [customGemstoneType, setCustomGemstoneType] = useState("");
 
     // Gem (+ photos, first one is the main photo) -> DRAFT listing. Certificates are not uploaded yet.
+
     async function createDraft() {
+        const finalGemstoneType =
+            gemstoneType === "Other"
+                ? customGemstoneType.trim()
+                : gemstoneType;
+
         const gem = (await api("/api/gems", {
             method: "POST",
-            body: { gem_name: gemstoneName, gem_type: gemstoneType, description },
+            body: {
+                gem_name: gemstoneName,
+                gem_type: finalGemstoneType,
+                description,
+            },
         })).gem;
+
         for (const file of images) {
             await api(`/api/gems/${gem.gem_id}/images`, {
                 method: "POST",
                 body: { image_url: await resizeImage(file) },
             });
         }
-        return (await api("/api/listings", { method: "POST", body: { gem_id: gem.gem_id } })).listing;
+
+        return (
+            await api("/api/listings", {
+                method: "POST",
+                body: { gem_id: gem.gem_id },
+            })
+        ).listing;
     }
+
 
     async function run(task) {
         setBusy(true);
@@ -119,17 +138,41 @@ export default function CreateListing() {
                     </div>
                     <div className="listing-form-group">
                         <label htmlFor="gemstoneType">Gemstone Type</label>
+
                         <select
                             id="gemstoneType"
                             value={gemstoneType}
-                            onChange={(event) => setGemstoneType(event.target.value)}
+                            onChange={(event) => {
+                                setGemstoneType(event.target.value);
+                                setCustomGemstoneType("");
+                            }}
                         >
-                            <option value="Sapphire">Sapphire</option>
-                            <option value="Ruby">Ruby</option>
-                            <option value="Emerald">Emerald</option>
+                            <option value="Amber">Amber</option>
+                            <option value="Amethyst">Amethyst</option>
+                            <option value="Citrine">Citrine</option>
                             <option value="Diamond">Diamond</option>
+                            <option value="Emerald">Emerald</option>
+                            <option value="Jade">Jade</option>
+                            <option value="Lapis">Lapis</option>
+                            <option value="Pearl">Pearl</option>
+                            <option value="Rose Quartz">Rose Quartz</option>
+                            <option value="Ruby">Ruby</option>
+                            <option value="Sapphire">Sapphire</option>
                             <option value="Other">Other</option>
                         </select>
+
+                        {gemstoneType === "Other" && (
+                            <input
+                                id="customGemstoneType"
+                                type="text"
+                                placeholder="Enter gemstone type"
+                                value={customGemstoneType}
+                                onChange={(event) =>
+                                    setCustomGemstoneType(event.target.value)
+                                }
+                                required
+                            />
+                        )}
                     </div>
                     <div className="listing-form-group">
                         <label htmlFor="description">Description</label>
