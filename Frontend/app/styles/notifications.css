@@ -103,3 +103,23 @@
 .notification-card button:hover {
     background-color: #eeeeee;
 }
+
+/* Notification indicator in the top navigation */
+.nav-link--unread {
+    color: #dc2626 !important;
+    font-weight: 700;
+}
+
+.notification-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background-color: #dc2626;
+    color: white;
+    font-size: 12px;
+    line-height: 1;
+}

@@ -7,7 +7,7 @@ import { getToken, logout, saveLogin } from "./lib/api";
 // Account links for the top nav. Shows Log in / Sign up when logged out.
 export default function AccountNav() {
 	const [user, setUser] = useState(null);
-
+	const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 	useEffect(() => {
 		const token = getToken();
 		if (!token) return;
@@ -45,7 +45,20 @@ export default function AccountNav() {
 			<li><Link className="nav-link" href="/cart">Cart</Link></li>
 			<li><Link className="nav-link" href="/my-purchases">My Purchases</Link></li>
 			<li><Link className="nav-link" href="/my-bids">My Bids</Link></li>
-			<li><Link className="nav-link" href="/notification">Notifications</Link></li>
+			<li>
+    			<Link
+        			className={`nav-link ${hasUnreadNotifications ? "nav-link--unread" : ""}`}
+        			href="/notification"
+        			onClick={() => setHasUnreadNotifications(false)}
+    			>
+        			Notifications
+        			{hasUnreadNotifications && (
+            			<span className="notification-dot" aria-label="Unread notifications">
+                			!
+            			</span>
+        			)}
+    			</Link>
+			</li>
 			{isSeller ? (
 				<>
 					<li><Link className="nav-link" href="/create-listing">Create Listing</Link></li>
