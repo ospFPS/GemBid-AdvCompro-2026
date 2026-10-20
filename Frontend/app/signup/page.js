@@ -31,7 +31,6 @@ export default function SignupPage() {
 
   return (
     <main className="login-signup-page">
-      <img src="/assets/Dependencies2.gif"/>
       <section className="auth-card" aria-labelledby="signup-heading">
         <Link className="auth-brand" href="/store">GemBid</Link>
         <h1 id="signup-heading">Create your account</h1>
