@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getListingById } from "../listings";
-import { formatTHB } from "../lib/api";
 import BidForm from "./BidForm";
 
 export default async function BidPage({ searchParams }) {
@@ -27,10 +26,6 @@ export default async function BidPage({ searchParams }) {
 						</span>
 						<h2 id="bid-listing-heading">{item.title}</h2>
 						<p>{item.description}</p>
-						<p className="bid-listing-price">
-							<span>Current price</span>
-							<strong>{formatTHB(item.price)}</strong>
-						</p>
 						<div className="listing-seller">
 							<img src={item.pfp} alt="" />
 							<span>Sold by {item.seller}</span>

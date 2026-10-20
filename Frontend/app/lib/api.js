@@ -39,6 +39,16 @@ export async function api(path, { method = "GET", body } = {}) {
 	return res.json();
 }
 
+// True when the logged-in user has unread notifications (false when logged out or on error).
+export function hasUnreadNotifications() {
+	const token = getToken();
+	if (!token) return Promise.resolve(false);
+	return fetch("/api/notifications?unread=true", { headers: { Authorization: `Bearer ${token}` } })
+		.then((res) => (res.ok ? res.json() : null))
+		.then((data) => (data?.unread_count ?? 0) > 0)
+		.catch(() => false);
+}
+
 export function formatTHB(amount) {
 	return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(amount ?? 0);
 }

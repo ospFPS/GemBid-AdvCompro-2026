@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { hasUnreadNotifications as checkUnread } from "../lib/api";
 
 export default function Home() {
     const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+    useEffect(() => {
+        checkUnread().then(setHasUnreadNotifications);
+    }, []);
 
     return (
         <main className="user-home">

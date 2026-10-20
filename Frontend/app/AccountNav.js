@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getToken, logout, saveLogin } from "./lib/api";
+import { getToken, hasUnreadNotifications as checkUnread, logout, saveLogin } from "./lib/api";
 
 // Account links for the top nav. Shows Log in / Sign up when logged out.
 export default function AccountNav() {
@@ -23,6 +23,10 @@ export default function AccountNav() {
 				}
 			})
 			.catch(() => {});
+		const refreshUnread = () => checkUnread().then(setHasUnreadNotifications);
+		refreshUnread();
+		const timer = setInterval(refreshUnread, 30000);
+		return () => clearInterval(timer);
 	}, []);
 
 	if (!user) {
