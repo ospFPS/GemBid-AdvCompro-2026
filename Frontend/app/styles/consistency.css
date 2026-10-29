@@ -678,7 +678,7 @@ body {
 .order-item img,
 .my-auction-card img {
   max-width: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .listing-card img {

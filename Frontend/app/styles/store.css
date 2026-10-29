@@ -200,7 +200,7 @@
   display: block;
   width: 100%;
   height: 250px;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .store-item h2 {
