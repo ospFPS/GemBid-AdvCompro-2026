@@ -28,7 +28,6 @@ export default function LoginPage() {
 
   return (
     <main className="login-signup-page">
-      <img src="/assets/Dependencies2.gif"/>
       <section className="auth-card" aria-labelledby="login-heading">
         <Link className="auth-brand" href="/store">GemBid</Link>
         <h1 id="login-heading">Log in</h1>

@@ -125,7 +125,6 @@ export default async function StorePage({ searchParams }) {
             <button type="submit">Apply price range</button>
           </form>
 
-          <img src="/assets/Dependencies.gif"/>
         </nav>
 
         {/* listing */}
