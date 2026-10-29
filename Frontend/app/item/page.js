@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ReportButton from "../ReportButton";
 import { notFound } from "next/navigation";
 import { getListingById, getMoreListings } from "../listings";
 import AddToCartButton from "../cart/AddToCartButton";
@@ -64,6 +65,7 @@ export default async function ItemPage({ searchParams }) {
 								</>
 							)}
 						</div>
+						<ReportButton listingId={item.id} />
 					</div>
 				</div>
 			</article>

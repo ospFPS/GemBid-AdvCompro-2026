@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getListingById } from "../listings";
 import BidForm from "./BidForm";
+import ReportButton from "../ReportButton";
 
 export default async function BidPage({ searchParams }) {
 	const { itemId } = await searchParams;
@@ -36,6 +37,7 @@ export default async function BidPage({ searchParams }) {
 				<aside className="bid-summary" aria-labelledby="bid-summary-heading">
 					<h2 id="bid-summary-heading">Your bid</h2>
 					<BidForm auctionId={item.auctionId} />
+					<ReportButton auctionId={item.auctionId} />
 				</aside>
 			</div>
 			<Link className="nav-link cart-continue" href="/store">
